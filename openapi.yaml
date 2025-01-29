@@ -1,0 +1,189 @@
+openapi: 3.0.2
+
+info:
+  version: 0.0.1
+  title: InSustain
+  description: > 
+    InSustain tool for energy observability on the EU INTEND project.
+    API for requesting on-demand and event suscription of NWDAF Analytics data.
+
+servers:
+  - url: '{apiRoot}/nnwdaf-analyticsinfo/v1'
+    variables:
+      apiRoot:
+        default: https://example.com
+        description: apiRoot as defined in clause 4.4 of 3GPP TS 29.501.
+
+paths:
+  /analytics:
+    get:
+      summary: Request on demand energy metrics analytics data.
+      operationId: GetNWDAFAnalytics
+      tags:
+        - On Demand Analytics
+      parameters:
+        - name: event-id
+          in: query
+          description: Identify the analytics.
+          required: true
+          schema:
+            $ref: '#/components/schemas/EventId'
+        - name: event-filter
+          in: query
+          description: >
+            Options to filter the analytics report.
+            We currently support filtering by appIds and appTypes.
+            appIds can be any kubernetes label selector.
+            appTypes can be certain kubernetes resources as specified in the schema.
+          example: '{"anySlice":true, "appIds":"app=udp-client", "appTypes":"POD"}'
+          required: true
+          schema:
+            type: string
+        - name: ana-req
+          in: query
+          description: > 
+            Analytics requirement for event suscription.
+            Currently we support filtering by starting timestamp, ending timestamp
+            and an offset period. The offset period has precedence over the start
+            and end timestamps. The offset period is in units of minutes.
+            A negative offset period means statistics in the past offset period,
+            while a positive value means prediction in the future offset period.
+          required: true
+          example: '{"offsetPeriod": -60}'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventReportingRequirement'
+
+      responses:
+        '200':
+          description: >
+            Containing the analytics with parameters as relevant for the requesting NF service
+            consumer.
+          content:
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/AnalyticsData'
+        '204':
+          description: No Content. The requested NWDAF Analytics data does not exist.
+
+components:
+  schemas:
+
+    EventReportingRequirement:
+      description: Represents the type of reporting that the subscription requires.
+      type: object
+      properties:
+        startTs:
+          format: timestamp
+          type: string
+          description: string with format 'date-time' as defined in OpenAPI.
+        endTs:
+          format: timestamp
+          type: string
+          description: string with format 'date-time' as defined in OpenAPI.
+        offsetPeriod:
+          type: integer
+          description: >
+            Offset period in units of seconds to the reporting time, if the value is negative means
+            statistics in the past offset period, otherwise a positive value means prediction in the
+            future offset period. May be present if the "repPeriod" attribute is included within the
+            "evtReq" attribute or the "repetitionPeriod" attribute is included within the
+            EventSubscription type.
+
+    EventFilter:
+      type: object
+      properties:
+        anySlice:
+          type: boolean
+        appIds:
+          type: array
+          items:
+            type: string
+            description: The application identifier.
+          minItems: 1
+        appTypes:
+          type: array
+          items:
+            type: string
+            enum:
+              - CONTAINER
+              - POD
+              - NAMESPACE
+              - NODE
+            description: The application type.
+          minItems: 1
+
+    AnalyticsData:
+      type: object
+      description: >
+        Represents the description of analytics with parameters as relevant for the requesting NF
+        service consumer.
+      properties:
+        timeStampGen:
+          format: date-time
+          type: string
+          description: string with format 'date-time' as defined in OpenAPI.
+        AnalyticsSubset:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsSubset'
+          minItems: 1
+
+    EventId:
+      anyOf:
+      - type: string
+        enum:
+          - CPU_JOULES
+          - DRAM_JOULES
+          - BPF_CPU_TIME_US
+          - CPU_CYCLES
+      nullable: false
+
+    ProblemDetails:
+      description: Provides additional information in an error response.
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/Uri'
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence of the problem.
+        instance:
+          $ref: '#/components/schemas/Uri'
+        cause:
+          type: string
+          description: >
+            A machine-readable application error cause specific to this occurrence of the problem. 
+            This IE should be present and provide application-related error information, if
+            available.
+
+    Uri:
+      type: string
+      description: String providing an URI formatted according to RFC 3986.
+
+    AnalyticsSubset:
+      description: Represents the energy metric array
+      type: object
+      properties:
+        timestamp:
+          format: date-time
+          type: string
+        metric_value:
+          type: number
+        metric_name:
+          type: string
+        aggregation_level:
+          type: string
+        resource_id:
+          type: string
+      allOf:
+        - required: [timestamp]
+        - required: [metric_value]
+        - required: [metric_name]
+        - required: [aggregation_level]
+        - required: [resource_id]
