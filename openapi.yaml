@@ -35,10 +35,11 @@ paths:
             We currently support filtering by appIds and appTypes.
             appIds can be any kubernetes label selector.
             appTypes can be certain kubernetes resources as specified in the schema.
-          example: '{"anySlice":true, "appIds":"app=udp-client", "appTypes":"POD"}'
           required: true
-          schema:
-            type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventFilter'
         - name: ana-req
           in: query
           description: > 
@@ -49,7 +50,6 @@ paths:
             A negative offset period means statistics in the past offset period,
             while a positive value means prediction in the future offset period.
           required: true
-          example: '{"offsetPeriod": -60}'
           content:
             application/json:
               schema:
@@ -90,9 +90,11 @@ components:
             future offset period. May be present if the "repPeriod" attribute is included within the
             "evtReq" attribute or the "repetitionPeriod" attribute is included within the
             EventSubscription type.
+      example: '{"offsetPeriod": -60}'
 
     EventFilter:
       type: object
+      example: '{"anySlice":true, "appIds":"app=udp-client", "appTypes":"POD"}'
       properties:
         anySlice:
           type: boolean
