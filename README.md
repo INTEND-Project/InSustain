@@ -1,3 +1,3 @@
 # InSustain
 
-The API definition for the tool is available at [OpenAPI definition](openapi.json)
+The API definition for the tool is available at [OpenAPI definition](openapi.yaml)
