@@ -1,0 +1,35 @@
+{{- if .Values.configmap.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{.Values.configmap.name}}
+data:
+  default.conf: |
+    # Your custom nginx configuration here
+    server {
+        listen 8080;
+        server_name localhost;
+
+        location / {
+            root /usr/share/nginx/html;  # Change this to your React build folder
+            index index.html;
+            try_files $uri /index.html;
+        }
+
+        location /ws {
+        proxy_pass http://{{.Release.Name}}-backend:{{ .Values.backend.port }};  # Adjust to match your backend service
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        }
+
+        location /nginx-health {
+            access_log off;
+            default_type text/plain;
+            return 200 "healthy\n";
+        }
+
+    }
+{{- end}}

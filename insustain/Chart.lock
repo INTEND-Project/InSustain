@@ -1,0 +1,12 @@
+dependencies:
+- name: kepler
+  repository: https://sustainable-computing-io.github.io/kepler-helm-chart
+  version: 0.5.13
+- name: frontend
+  repository: file://charts/frontend
+  version: 0.1.0
+- name: backend
+  repository: file://charts/backend
+  version: 0.1.0
+digest: sha256:f99d72b239356aa93ff67be5e3646581e9c159eab5e9b28751156428da286520
+generated: "2025-03-07T09:46:58.010062382Z"
