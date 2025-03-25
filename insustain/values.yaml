@@ -124,7 +124,10 @@
 
 backend:
   service:
-    port: 8089
+    backend:
+      port: 8089
+    jupyter:
+      port: 8888
   image:
     repository: localhost:5000/insustain/backend
     tag: latest
@@ -134,7 +137,10 @@ frontend:
     repository: localhost:5000/insustain/frontend
     tag: latest
   backend:
-    port: 8089
+    jupyter:
+      port: 8888
+    backend:
+      port: 8089
   configmap:
     enabled: true
     name: frontend-configmap

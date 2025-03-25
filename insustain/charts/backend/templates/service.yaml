@@ -7,9 +7,13 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
+    - port: {{ .Values.service.backend.port }}
+      targetPort: backend
       protocol: TCP
-      name: http
+      name: backend
+    - port: {{ .Values.service.jupyter.port }}
+      targetPort: jupyter
+      protocol: TCP
+      name: jupyter
   selector:
     {{- include "backend.selectorLabels" . | nindent 4 }}

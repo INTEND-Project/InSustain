@@ -96,11 +96,13 @@ resources: {}
 livenessProbe:
   httpGet:
     path: /docs
-    port: http
+    port: backend
+  initialDelaySeconds: 30
 readinessProbe:
   httpGet:
     path: /docs
-    port: http
+    port: backend
+  initialDelaySeconds: 30
 
 # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
 autoscaling:
