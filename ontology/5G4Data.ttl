@@ -1,0 +1,192 @@
+@prefix data5g: <http://data5g.eu/data5g#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix geo: <http://www.opengis.net/ont/geosparql#> .
+@prefix icm: <http://tio.models.tmforum.org/tio/v3.6.0/IntentCommonModel/> .
+@prefix log: <http://tio.models.tmforum.org/tio/v3.6.0/LogicalOperators/> .
+@prefix quan: <http://tio.models.tmforum.org/tio/v3.6.0/QuantityOntology/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix set: <http://tio.models.tmforum.org/tio/v3.6.0/SetOperators/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+
+data5g:I1 a icm:Intent ;
+    log:allOf ( data5g:DE1 data5g:RE1 ) ;
+.
+
+data5g:DE1 a icm:DeliveryExpectation ;
+    icm:target data5g:network-slice ;
+    dct:description "Ensure low latency and sufficient bandwidth in the 5G network for customer +47 90914547 store in Tromsø."@en ;
+    log:allOf ( data5g:C1 data5g:C2 data5g:CX1 ) ;
+.
+
+data5g:C1 a icm:Condition ;
+    set:forAll (
+    _:X
+    [ icm:valuesOfTargetProperty ( data5g:5GTelenorLatency ) ]
+    quan:smaller ( _:X [ rdf:value "20"^^xsd:decimal ; quan:unit "ms" ] )
+    ) ;
+.
+
+data5g:C2 a icm:Condition ;
+    set:forAll (
+    _:X
+    [ icm:valuesOfTargetProperty ( data5g:5GTelenorBandwidth ) ]
+    quan:larger ( _:X [ rdf:value "300"^^xsd:decimal ; quan:unit "mbit/s" ] )
+    ) ;
+.
+
+data5g:CX1 a icm:Context ;
+    data5g:appliesToRegion data5g:K1ShoppingMallRegion ;
+    data5g:appliesToCustomer "+47 90914547"^^xsd:string
+.
+
+data5g:K1ShoppingMallRegion a geo:Feature ;
+    geo:hasGeometry [
+    a geo:Polygon ;
+    geo:asWKT "POLYGON((69.673545 18.921344, 69.673448 18.924026, 69.672195 18.923903, 69.672356 18.921052))"^^geo:wktLiteral ;
+    ] ;
+.
+
+data5g:RE1 a icm:ReportingExpectation ;
+    icm:target data5g:5GNetwork ;
+    dct:description "Report if expectation is met with reports including metrics related to expectations."@en ;
+.
+
+
+
+# Template for workload deployment
+
+@prefix data5g: <http://data5g.eu/data5g#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix geo: <http://www.opengis.net/ont/geosparql#> .
+@prefix icm: <http://tio.models.tmforum.org/tio/v3.6.0/IntentCommonModel/> .
+@prefix log: <http://tio.models.tmforum.org/tio/v3.6.0/LogicalOperators/> .
+@prefix quan: <http://tio.models.tmforum.org/tio/v3.6.0/QuantityOntology/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix set: <http://tio.models.tmforum.org/tio/v3.6.0/SetOperators/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+data5g:I1 a icm:Intent ;
+  log:allOf ( data5g:DE1 data5g:RE2 ) ;
+.
+
+data5g:DE1 a data5g:DeploymentExpectation ;
+  icm:target data5g:deployment ;
+  dct:description "Ensure the AR application is deployed to a local Edge Data Center with compute latency below 10ms."@en ;
+  log:allOf ( data5g:C1 data5g:CX1 ) ;
+.
+
+data5g:C1 a icm:Condition ;
+  set:forAll ( _:X
+    [ icm:valuesOfTargetProperty ( data5g:ComputeLatency ) ]
+    quan:smaller ( _:X [ rdf:value "20"^^xsd:decimal ;
+      quan:unit "ms"
+    ] )
+  ) ;
+.
+
+data5g:CX1 a icm:Context ;
+  data5g:DataCenter "EC1" ;
+  data5g:Application "AR-retail-app" ;
+  data5g:DeploymentDescriptor "http://intend.eu/data5gWorkloadCatalogue/ar-retail-app-deployment.tgz" ;
+.
+
+data5g:RE1 a icm:ReportingExpectation ;
+  icm:target data5g:EdgeDataCenter ;
+  dct:description "Report whether the Edge Data Center compute latency expectation is met with true or false reports."@en ;
+.
+
+
+# ===================== inSustain extensions ===========================
+
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix instn: <http://intend.org/insustain/> .
+
+
+instn:AnalyticsProvider a rdfs:Class .
+instn:ResourceDomainAnalyticsProvider a rdf:Class ;
+    rdfs:subClassOf rdfs:Class ; # needed for class hierarchy plots
+    .
+instn:EndToEndAnalyticsProvider a rdf:Class ;
+    rdfs:subClassOf rdfs:Class ; # needed for class hierarchy plots
+    . 
+instn:instance1 a instn:ResourceDomainAnalyticsProvider . 
+
+instn:instance1 {  # Assuming we can have multiple end-to-end
+    instn:endpoint1 
+        rdf:type instn:ServiceEndpoint ;
+        instn:url "https://api.monitoring.insustain.com/v1/metrics?app=AR-retail-app" ;
+        instn:checkInterval "300"^^xsd:integer ;
+        instn:protocol "HTTPS" ;
+        instn:status "active" ;
+        instn:responseTimeout "30"^^xsd:integer ;
+        instn:alertThreshold "95.0"^^xsd:decimal ;  # we could have even notifications (just kept here for reminder, not valid for this use-case)
+        data5g:Application "AR-retail-app" ;  # Would be good to have some App specific urn instead of literals (see 5GData use-case)
+        instn:appParams: data5g:ComputeLatency ; # bind to the use-case specific param, this could be more generic too or a rdfs:subClassOf intend:computeLatency?
+        .
+
+    instn:endpoint2
+        rdf:type instn:ServiceEndpoint ;
+        instn:url "https://api.monitoring.insustain.com/v1/metrics?app=DroneControl" ;
+        instn:checkInterval "300"^^xsd:integer ;
+        instn:protocol "HTTPS" ;
+        instn:status "active" ;
+        instn:responseTimeout "30"^^xsd:integer ;
+        instn:alertThreshold "95.0"^^xsd:decimal ;
+        data5g:Application "DroneControl" ;
+        instn:regionType instn:region1 ; # this can be used to attribute energy per region
+        .
+
+    instn:prometheusProfile1
+        rdf:type instn:PrometheusProfile ;
+        instn:promethesParam instn:prometheusParam1 ;
+        instn:promethesParam instn:prometheusParam2 ;
+        instn:promethesParam instn:prometheusParam3 ;
+        .
+
+    instn:prometheusParam1
+        rdf:type instn:PrometheusParam ;
+        instn:prometheusMetric "ConsumersWithHighVideo" ;
+        instn:checkInterval "300"^^xsd:integer ;
+        .
+
+    instn:prometheusParam2
+        rdf:type instn:PrometheusParam ;
+        instn:prometheusMetric "ConsumersWithMediumVideo" ;
+        instn:checkInterval "300"^^xsd:integer ;
+        .
+
+    instn:prometheusParam3
+        rdf:type instn:PrometheusParam ;
+        instn:prometheusMetric "ConsumersWithLowVideo" ;
+        instn:checkInterval "300"^^xsd:integer ;
+        .
+
+    instn:region1 # define parameters for a region type and bind this to the use-case parameters?
+        rdf:type instn:RegionDefinition ; 
+        instn:zoneParams: data5g:appliesToRegion ;
+        instn:zoneParams: data5g:appliesToCustomer ;
+        .
+}
+
+
+instn:instanceEndToEnd a instn:EndToEndAnalyticsProvider . 
+
+instn:instanceEndToEnd {  # we can define the analytics aggregation service
+    instn:endtoend1
+        rdf:type instn:ServiceEndpoint ;
+        instn:url "https://api.monitoring.insustain.com/v1/metrics?app=<uuid_for_app>" ;
+        instn:checkInterval "300"^^xsd:integer ;
+        instn:protocol "HTTPS" ;
+        instn:status "active" ;
+        instn:responseTimeout "30"^^xsd:integer ;
+        instn:alertThreshold "95.0"^^xsd:decimal ;
+        data5g:Application "<AppName>" ;
+        instn:appParams: data5g:EdgeDataCenter ; 
+        instn:regionType instn:region1 ; # this can be used to attribute energy per region
+        .
+
+}
