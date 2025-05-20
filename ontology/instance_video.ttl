@@ -1,0 +1,64 @@
+
+@prefix instn: <http://example.org/instn#> .
+@prefix prometheus: <http://example.org/prometheus#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+################################################################
+# Instances for Target Application and Services
+################################################################
+
+instn:StreamingVideoApp a instn:TargetApplication ;
+    instn:hasService instn:VideoIngestService, instn:TranscodingService .
+
+instn:VideoIngestService a instn:Service ;
+    instn:hasEndpoint instn:Pod_ingest_1 .
+
+instn:TranscodingService a instn:Service ;
+    instn:hasEndpoint instn:Pod_transcode_1 .
+
+################################################################
+# Service Endpoints (Pods)
+################################################################
+
+instn:Pod_ingest_1 a instn:ServiceEndpoint ;
+    instn:hasEndpointType instn:Pod ;
+    instn:exposesMetric prometheus:cpu_usage_ingest_1 .
+
+instn:Pod_transcode_1 a instn:ServiceEndpoint ;
+    instn:hasEndpointType instn:Pod ;
+    instn:exposesMetric prometheus:cpu_usage_transcode_1 .
+
+################################################################
+# Resources
+################################################################
+
+instn:CPU a instn:Resource .
+
+################################################################
+# Metrics - Prometheus Metrics instances (CPU and Memory Usage)
+################################################################
+
+# For simplicity, reusing prometheus prefix for metrics
+prometheus:cpu_usage_ingest_1 a instn:ApplicationMetric ;
+    instn:monitorsResource instn:CPU ;
+    instn:hasAggregationLevel instn:PodLevel .
+
+prometheus:cpu_usage_transcode_1 a instn:ApplicationMetric ;
+    instn:monitorsResource instn:CPU ;
+    instn:hasAggregationLevel instn:PodLevel .
+
+# Aggregated metrics at Namespace Level
+prometheus:cpu_usage_namespace a instn:ApplicationMetric ;
+    instn:monitorsResource instn:CPU ;
+    instn:hasAggregationLevel instn:NamespaceLevel .
+
+################################################################
+# Analytics Provider instance
+################################################################
+
+instn:AnalyticsProvider_1 a instn:AnalyticsProvider ;
+    instn:analyzes prometheus:cpu_usage_ingest_1,
+                    prometheus:cpu_usage_transcode_1,
+                    prometheus:cpu_usage_namespace,
+                    prometheus:memory_usage_namespace ;
+    instn:reportsAggregationLevel instn:NamespaceLevel .

@@ -1,0 +1,123 @@
+@prefix instn: <http://example.org/instn#> .
+@prefix prometheus: <http://example.org/prometheus#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+################################################################
+# Classes
+################################################################
+
+instn:TargetApplication a rdfs:Class ;
+    rdfs:label "Target Application" ;
+    rdfs:comment "An application being monitored for energy metrics." .
+
+instn:AnalyticsProvider a rdfs:Class ;
+    rdfs:label "Analytics Provider" ;
+    rdfs:comment "An entity or system that receives energy metrics and performs analysis on behalf of a stakeholder." .
+
+instn:ServiceEndpoint a rdfs:Class ;
+    rdfs:label "Service Endpoint" ;
+    rdfs:comment "An individual deployable unit (e.g., a container or pod) of the monitored application." .
+
+instn:Service a rdfs:Class ;
+    rdfs:label "Service" ;
+    rdfs:comment "A logical component or module of an application." .
+
+prometheus:PrometheusMetric a rdfs:Class ;
+    rdfs:label "Prometheus Metric" ;
+    rdfs:comment "A metric exposed by the system, e.g., energy consumption or CPU usage." .
+
+instn:EnergyMetric a rdfs:Class ;
+    rdfs:subClassOf prometheus:PrometheusMetric ;
+    rdfs:label "Energy Metric" ;
+    rdfs:comment "A Prometheus metric that reports energy consumption (e.g., joules, watts)." .
+
+instn:ApplicationMetric a rdfs:Class ;
+    rdfs:subClassOf prometheus:PrometheusMetric ;
+    rdfs:label "Application Metric" ;
+    rdfs:comment "A Prometheus metric that reports application-level KPIs (e.g., request latency)." .
+
+instn:Resource a rdfs:Class ;
+    rdfs:label "Resource" ;
+    rdfs:comment "The resource for which a metric is calculated, e.g., CPU or memory." .
+
+instn:AggregationLevel a rdfs:Class ;
+    rdfs:label "Aggregation Level" ;
+    rdfs:comment "The level of aggregation applied to the metrics, e.g., service-level, end-to-end." .
+
+instn:ServiceLevel a rdfs:Class ;
+    rdfs:subClassOf instn:AggregationLevel ;
+    rdfs:label "Service Level" .
+
+instn:NamespaceLevel a rdfs:Class ;
+    rdfs:subClassOf instn:AggregationLevel ;
+    rdfs:label "Namespace Level" .
+
+instn:PodLevel a rdfs:Class ;
+    rdfs:subClassOf instn:AggregationLevel ;
+    rdfs:label "Pod Level" .
+
+instn:EndToEnd a rdfs:Class ;
+    rdfs:subClassOf instn:AggregationLevel ;
+    rdfs:label "End-to-End Level" .
+
+instn:EndpointType a rdfs:Class ;
+    rdfs:label "Endpoint Type" ;
+    rdfs:comment "Specifies the type of endpoint (e.g., Pod, Service)." .
+
+instn:Pod a rdfs:Class ;
+    rdfs:subClassOf instn:EndpointType ;
+    rdfs:label "Pod" .
+
+instn:K8sService a rdfs:Class ;
+    rdfs:subClassOf instn:EndpointType ;
+    rdfs:label "Kubernetes Service" .
+
+################################################################
+# Properties
+################################################################
+
+instn:hasEndpoint a rdf:Property ;
+    rdfs:domain instn:Service ;
+    rdfs:range instn:ServiceEndpoint ;
+    rdfs:label "has endpoint" ;
+    rdfs:comment "Links the application to its service endpoints." .
+
+instn:analyzes a rdf:Property ;
+    rdfs:domain instn:AnalyticsProvider ;
+    rdfs:range prometheus:PrometheusMetric ;
+    rdfs:label "analyzes metric" ;
+    rdfs:comment "The metrics analyzed by the target application." .
+
+instn:monitorsResource a rdf:Property ;
+    rdfs:domain prometheus:PrometheusMetric ;
+    rdfs:range instn:Resource ;
+    rdfs:label "monitors resource" ;
+    rdfs:comment "The resource that the energy metric estimates." .
+
+instn:hasAggregationLevel a rdf:Property ;
+    rdfs:domain prometheus:PrometheusMetric ;
+    rdfs:range instn:AggregationLevel ;
+    rdfs:label "aggregation level" ;
+    rdfs:comment "The level of aggregation applied to the metric." .
+
+instn:reportsAggregationLevel a rdf:Property ;
+    rdfs:domain instn:AnalyticsProvider ;
+    rdfs:range instn:AggregationLevel ;
+    rdfs:label "Has Aggregation Level" ;
+    rdfs:comment "The aggregation level of the analytics output." .
+
+instn:hasService a rdf:Property ;
+    rdfs:domain instn:TargetApplication ;
+    rdfs:range instn:Service ;
+    rdfs:label "has service" .
+
+instn:exposesMetric a rdf:Property ;
+    rdfs:domain instn:ServiceEndpoint ;
+    rdfs:range prometheus:PrometheusMetric ;
+    rdfs:label "exposes metric" .
+
+instn:hasEndpointType a rdf:Property ;
+    rdfs:domain instn:ServiceEndpoint ;
+    rdfs:range instn:EndpointType ;
+    rdfs:label "Has Endpoint Type" ;
+    rdfs:comment "The type of service endpoint." .
