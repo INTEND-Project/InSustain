@@ -10,6 +10,8 @@ global:
 
 backend:
   enabled: true
+  mongo:
+    db: monitoring
   service:
     backend:
       port: 8089
@@ -47,7 +49,7 @@ kepler:
   serviceMonitor:
     enabled: true
     labels:
-      release: prometheus
+      release: monitoring
 
 mongodb:
   enabled: true
@@ -182,27 +184,20 @@ flask-streamer:
     # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
     port: 5050
     nodePort: 30051
-  webpath: /dev/video0
   volumeMounts:
     - name: videos
       mountPath: /app/videos
-    - name: video-device
-      mountPath: /dev/video0
   volumes:
     - name: videos
       hostPath:
         path: /opt/videos
         type: Directory
-    - name: video-device
-      hostPath:
-        path: /dev/video0
-        type: CharDevice
   serviceMonitor:
     enabled: true
     portName: main  # Name of the port defined in your service
     enabled: true
     labels:
-      release: prometheus
+      release: monitoring
 
 locust:
   enabled: true

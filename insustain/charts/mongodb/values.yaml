@@ -1,8 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: mongo
+  repository: docker.io/library/mongo
   pullPolicy: IfNotPresent
+  tag: "7.0"
 
 auth:
   rootUsername: admin
