@@ -47,17 +47,14 @@ spec:
             - name: jupyter
               containerPort: {{ .Values.service.jupyter.port }}
               protocol: TCP
+            - name: pm
+              containerPort: {{ .Values.service.pm.port }}
+              protocol: TCP
           env:
             - name: PROMETHEUS_URL
               value: "http://{{ .Values.prometheus.serviceName }}.{{ .Values.prometheus.namespace }}.svc.cluster.local:9090"
-          {{- with .Values.livenessProbe }}
-          livenessProbe:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .Values.readinessProbe }}
-          readinessProbe:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            - name: MLFLOW_URL
+              value: "http://{{ .Release.Name }}-mlflow-tracking.{{ .Release.Namespace }}.svc.cluster.local:80"
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

@@ -1,0 +1,56 @@
+1. Accessing the Flask Streamer Web GUI
+---------------------------------------
+
+The Flask Streamer application is exposed only inside the cluster (ClusterIP).
+To access it from your local machine, you need both:
+
+  - A Kubernetes port-forward
+  - An SSH tunnel into the cluster node / VM
+
+---
+
+2. Port-forward required services
+---------------------------------
+
+First, open port-forwards from your cluster:
+
+  # Forward the Flask Streamer pod (Web GUI on port 5050)
+  kubectl port-forward -n {{ .Release.Namespace }} pod/<flask-streamer-pod> 5050:5050
+
+  # Forward the SRS service (HLS playback on port 8081)
+  kubectl port-forward -n <srs-namespace> svc/srs-srs-server 8081:8080
+
+---
+
+3. Create SSH tunnels
+---------------------
+
+From your local laptop, establish SSH tunnels to the cluster node/VM.
+Adjust the user, host, and ports as needed.
+
+  ssh -L 5050:localhost:5050 \
+      -L 8081:localhost:8081 \
+      <user>@<cluster-node-ip>
+
+---
+
+4. Open the Web GUI
+-------------------
+
+After the port-forward and SSH tunnels are active, open your browser and visit:
+
+  http://localhost:5050
+
+The embedded HLS player will then fetch streams from:
+
+  http://localhost:8081/live/<stream-name>.m3u8
+
+---
+
+5. Notes
+--------
+
+- Replace `<flask-streamer-pod>` with the actual pod name, e.g.:
+    kubectl get pods -n {{ .Release.Namespace }}
+- Replace `<srs-namespace>` with the namespace where SRS is deployed.
+- Replace `<user>` and `<cluster-node-ip>` with your VM or cluster node SSH details.

@@ -15,5 +15,8 @@ spec:
       targetPort: jupyter
       protocol: TCP
       name: jupyter
+    - port: {{ .Values.service.pm.port }}
+      protocol: TCP
+      name: pm
   selector:
     {{- include "backend.selectorLabels" . | nindent 4 }}

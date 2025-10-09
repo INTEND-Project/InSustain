@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "srs.fullname" . }}
+  labels:
+    {{- include "srs.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "srs.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "srs.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "srs.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["./objs/srs", "-e"]
+          ports:
+            - name: rtmp
+              containerPort: {{ .Values.global.srs.rtmp }}
+              protocol: TCP
+            - name: http
+              containerPort: {{ .Values.global.srs.http }}
+              protocol: TCP
+            - name: api
+              containerPort: {{ .Values.service.api }}
+              protocol: TCP
+            - name: srt
+              containerPort: {{ .Values.service.srt }}
+              protocol: UDP
+            - name: rtc
+              containerPort: {{ .Values.service.rtc }}
+              protocol: UDP
+          env:
+            # The general default config.
+            - name: SRS_LISTEN
+              value: "1935"
+            - name: SRS_HTTP_SERVER_LISTEN
+              value: "8080"
+            - name: SRS_HTTP_API_LISTEN
+              value: "1985"
+            - name: SRS_SRT_SERVER_LISTEN
+              value: "10080"
+            - name: SRS_RTC_SERVER_LISTEN
+              value: "8000"
+            - name: SRS_RTC_SERVER_USE_AUTO_DETECT_NETWORK_IP
+              value: "off"
+            - name: SRS_PLATFORM
+              value: "helm"
+            # Overwrite the config by conf.
+            {{- range $key, $value := .Values.conf }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            # Overwrite the config by env.
+            {{- range .Values.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+            # Overwrite by special item.
+            {{- if .Values.candidate }}
+            - name: SRS_RTC_SERVER_CANDIDATE
+              value: {{ .Values.candidate | quote }}
+            {{- end }}
+            # In docker, should always disable the daemon.
+            - name: SRS_DAEMON
+              value: "off"
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

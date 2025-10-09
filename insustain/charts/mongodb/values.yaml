@@ -1,0 +1,19 @@
+replicaCount: 1
+
+image:
+  repository: mongo
+  pullPolicy: IfNotPresent
+
+auth:
+  rootUsername: admin
+  rootPassword: secret
+  database: monitoring
+
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClassName: "mongo-pvc"
+
+service:
+  type: ClusterIP
+  port: 27017

@@ -21,7 +21,7 @@ version: 0.1.0
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
-appVersion: "0.0.1"
+appVersion: "1.16.0"
 
 dependencies:
   # - condition: prometheus.enabled
@@ -36,7 +36,39 @@ dependencies:
     name: frontend
     repository: 'file://charts/frontend'
     version: 0.1.0
+  - condition: app-simulator.enabled
+    name: app-simulator
+    repository: 'file://charts/app-simulator'
+    version: 0.1.0
   - condition: backend.enabled
     name: backend
     repository: 'file://charts/backend'
     version: 0.1.0
+  - condition: mlflow.enabled
+    name: mlflow
+    version: "2.5.7"
+    repository: https://charts.bitnami.com/bitnami
+  - condition: mysql.enabled
+    name: mysql
+    version: "14.0.0"
+    repository: https://charts.bitnami.com/bitnami
+  - condition: sysbench.enabled
+    name: sysbench
+    version: 0.1.0
+    repository: 'file://charts/mysqlbench'
+  - condition: flask-streamer.enabled
+    name: flask-streamer
+    version: 0.1.0
+    repository: 'file://charts/flask-streamer'
+  - condition: srs-server.enabled
+    name: srs-server
+    version: 1.0.5
+    repository: 'file://charts/srs-server'
+  - condition: locust.enabled
+    name: locust
+    version: 0.1.0
+    repository: 'file://charts/locust'
+  - condition: mongodb.enabled
+    name: mongodb
+    version: 0.1.0
+    repository: 'file://charts/mongodb'

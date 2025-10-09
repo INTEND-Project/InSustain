@@ -5,8 +5,29 @@ dependencies:
 - name: frontend
   repository: file://charts/frontend
   version: 0.1.0
+- name: app-simulator
+  repository: file://charts/app-simulator
+  version: 0.1.0
 - name: backend
   repository: file://charts/backend
   version: 0.1.0
-digest: sha256:f99d72b239356aa93ff67be5e3646581e9c159eab5e9b28751156428da286520
-generated: "2025-03-07T09:46:58.010062382Z"
+- name: mlflow
+  repository: https://charts.bitnami.com/bitnami
+  version: 2.5.7
+- name: mysql
+  repository: https://charts.bitnami.com/bitnami
+  version: 14.0.0
+- name: sysbench
+  repository: file://charts/mysqlbench
+  version: 0.1.0
+- name: flask-streamer
+  repository: file://charts/flask-streamer
+  version: 0.1.0
+- name: srs-server
+  repository: file://charts/srs-server
+  version: 1.0.5
+- name: locust
+  repository: file://charts/locust
+  version: 0.1.0
+digest: sha256:78cc8490564fac0904f4cb3d3a1e3a0ef8234b8dd8da3ccaad71699ffa8c0e92
+generated: "2025-09-23T17:18:12.979706807Z"

@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sysbench.fullname" . }}
+  labels:
+    {{- include "sysbench.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sysbench.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "sysbench.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{.Values.pullPolicy}}
+          ports:
+            - name: prom
+              containerPort: {{.Values.service.port}}
+              protocol: TCP
+          env:
+            - name: MYSQL_HOST
+              value: "{{.Release.Name}}-mysql.{{ .Release.Namespace }}.svc.cluster.local"
+            - name: MYSQL_USER
+              value: "root"
+            - name: MYSQL_PASSWORD
+              value: {{ .Values.mysql.auth.rootPassword | quote }}
+            - name: MYSQL_DB
+              value: {{ .Values.mysql.auth.database | quote }}
+            - name: WORKLOAD
+              value: {{ .Values.workload | default "oltp_read_write" | quote }}
