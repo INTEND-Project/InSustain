@@ -48,7 +48,7 @@ frontend:
     name: frontend-configmap
 
 kepler:
-  enabled: true
+  enabled: false
   serviceMonitor:
     enabled: true
     labels:
@@ -133,7 +133,7 @@ sysbench:
   workload: oltp_read_write
 
 srs:
-  enabled: true
+  enabled: false
   image:
   repository: ossrs/srs
   tag: "6"
@@ -172,7 +172,7 @@ srs:
       release: prometheus
 
 flask-streamer:
-  enabled: true
+  enabled: false
   image:
     # This sets the pull policy for images.
     pullPolicy: Always
@@ -200,7 +200,7 @@ flask-streamer:
       release: monitoring
 
 locust:
-  enabled: true
+  enabled: false
   image:
     repository: localhost:5000/insustain/locust
     # This sets the pull policy for images.
