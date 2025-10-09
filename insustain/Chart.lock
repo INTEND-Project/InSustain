@@ -12,8 +12,8 @@ dependencies:
   repository: file://charts/backend
   version: 0.1.0
 - name: mlflow
-  repository: https://charts.bitnami.com/bitnami
-  version: 2.5.7
+  repository: https://community-charts.github.io/helm-charts
+  version: 1.7.1
 - name: mysql
   repository: https://charts.bitnami.com/bitnami
   version: 14.0.0
@@ -29,5 +29,8 @@ dependencies:
 - name: locust
   repository: file://charts/locust
   version: 0.1.0
-digest: sha256:78cc8490564fac0904f4cb3d3a1e3a0ef8234b8dd8da3ccaad71699ffa8c0e92
-generated: "2025-09-23T17:18:12.979706807Z"
+- name: mongodb
+  repository: file://charts/mongodb
+  version: 0.1.0
+digest: sha256:26e47919520fabc22cfb32c6f8f306ef1c7ebfcb018d9e315a0da1900c6a29ad
+generated: "2025-10-09T15:12:51.164465632Z"

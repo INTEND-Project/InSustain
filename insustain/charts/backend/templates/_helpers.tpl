@@ -71,3 +71,11 @@ Create the name of the rbac account to use
 {{- default "default" .Values.rbac.name }}
 {{- end }}
 {{- end }}
+
+{{- define "mychart.fullImage" -}}
+{{- $repo := .Values.global.image.repository | default "localhost:5000" -}}
+{{- $prefix := .Values.global.image.prefix | default "insustain"}}
+{{- $tag := .Values.image.tag | default $.Chart.AppVersion -}}
+{{- printf "%s/%s/backend:%s" $repo $prefix $tag -}}
+{{- end -}}
+

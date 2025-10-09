@@ -60,3 +60,10 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "frontend.fullImage" -}}
+{{- $repo := .Values.global.image.repository | default "localhost:5000" -}}
+{{- $prefix := .Values.global.image.prefix | default "insustain"}}
+{{- $tag := .Values.image.tag | default $.Chart.AppVersion -}}
+{{- printf "%s/%s/frontend:%s" $repo $prefix $tag -}}
+{{- end -}}

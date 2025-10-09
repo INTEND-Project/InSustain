@@ -71,3 +71,10 @@ Create the name of the rbac account to use
 {{- default "default" .Values.rbac.name }}
 {{- end }}
 {{- end }}
+
+{{- define "mongo.fullImage" -}}
+{{- $repo := .Values.image.repository | default .Values.global.image.repository | default "localhost:5000" -}}
+{{- $image := .Values.image.name | default "mongo"}}
+{{- $tag := .Values.image.tag | default .Values.global.image.tag | default $.Chart.AppVersion -}}
+{{- printf "%s/%s:%s" $repo $image $tag -}}
+{{- end -}}

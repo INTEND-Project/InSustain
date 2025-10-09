@@ -22,8 +22,8 @@ spec:
         {{- end }}
     spec:
       containers:
-        - name: flask-streamer
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        - name: {{ .Chart.Name }}
+          image: {{ include "flask.fullImage" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             privileged: true

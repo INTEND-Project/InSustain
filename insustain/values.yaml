@@ -1,4 +1,8 @@
 global:
+  image:
+    repository: localhost:5000
+    prefix: insustain
+    
   srs:
     http: 8080
     rtmp: 1935
@@ -20,7 +24,6 @@ backend:
     pm:
       port: 8887
   image:
-    repository: localhost:5000/insustain/backend
     tag: latest
     pullPolicy: Always
   serviceMonitor:
@@ -52,6 +55,10 @@ kepler:
       release: monitoring
 
 mongodb:
+  image:
+    repository: docker.io
+    prefix: mongo
+    tag: "8.0"
   enabled: true
   service:
     type: ClusterIP
@@ -60,30 +67,24 @@ mongodb:
     storageClassName: "mongo-pvc"
 
 mlflow:
-  enabled: true
-  run:
+  service:
+    type: "NodePort"
+  auth:
     enabled: false
-  tracking:
-    persistence:
-      existingClaim: "mlflow"
-    service:
-      type: "NodePort"
-    auth:
-      enabled: false
-  minio:
-    auth:
-      rootUser: admin
-      rootPassword: adminpass
-    persistence:
-      existingClaim: "minio"
-  postgresql:
-    auth:
-      user: "user"
-      rootPassword: "rootpass"
-      password: "userpass"
-    primary:
-      persistence:
-        existingClaim: "postgresql"
+  # minio:
+  #   auth:
+  #     rootUser: admin
+  #     rootPassword: adminpass
+  #   persistence:
+  #     existingClaim: "minio"
+  # postgresql:
+  #   auth:
+  #     user: "user"
+  #     rootPassword: "rootpass"
+  #     password: "userpass"
+  #   primary:
+  #     persistence:
+  #       existingClaim: "postgresql"
 
 app-simulator:
   enabled: false
@@ -173,7 +174,6 @@ srs:
 flask-streamer:
   enabled: true
   image:
-    repository: localhost:5000/insustain/flask-app
     # This sets the pull policy for images.
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.

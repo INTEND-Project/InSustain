@@ -46,8 +46,8 @@ dependencies:
     version: 0.1.0
   - condition: mlflow.enabled
     name: mlflow
-    version: "2.5.7"
-    repository: https://charts.bitnami.com/bitnami
+    version: "1.7.1"
+    repository: "https://community-charts.github.io/helm-charts"
   - condition: mysql.enabled
     name: mysql
     version: "14.0.0"
