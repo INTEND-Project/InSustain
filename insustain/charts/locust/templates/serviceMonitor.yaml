@@ -6,7 +6,7 @@ metadata:
   namespace: {{ .Values.serviceMonitor.namespace | default .Release.Namespace }}
   labels:
     {{- include "locust.labels" . | nindent 4 }}
-    {{- with .Values.serviceMonitor.additionalLabels }}
+    {{- with .Values.global.monitoring.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
