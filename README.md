@@ -60,4 +60,4 @@ This is an architecture example of the inSustain application
 
 # API Documentation
 All the documentation from our API is available at
-![docs](docs.html) please download it and open it in your browser
+[docs](docs.html) please download it and open it in your browser
