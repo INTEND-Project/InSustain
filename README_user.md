@@ -7,7 +7,7 @@ InSustain provide estimated energy metrics for cloud native deployments. The ern
 - Kubernetes cluster v1.30.6+
 - HELM v3.17.1+
 - prometheus-operator v0.80+ (or any other equivalent Prometheus server)
-- [Kepler](https://sustainable-computing.io/) v0.7+ (Installed with inSustain)
+- [Kepler](https://sustainable-computing.io/) v0.8
 
 # Prometheus installation
 
@@ -17,34 +17,37 @@ We recommend the Kube Prometheus Stack helm chart, which includes the Node Expor
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 
-helm install prometheus prometheus-community/kube-prometheus-stack \
+helm install monitoring prometheus-community/kube-prometheus-stack \
     --namespace monitoring \
-    --create-namespace \
+    --wait
+```
+
+# Kepler installation
+We also recommend installing the Kepler chart on the monitoring namespace.
+
+```bash
+helm repo add kepler https://sustainable-computing-io.github.io/kepler-helm-chart
+helm install kepler kepler/kepler --version 0.8.0 --set serviceMonitor.enabled=true\
+    --set serviceMonitor.labels.release=monitoring \
+    --namespace monitoring \
     --wait
 ```
 
 # Install inSustain
 
-```bash
-helm install <helm-chart-name> insustain --create-namespace --namespace insustain --set backend.enabled=true --set frontend.enabled=true --set kepler.enabled=true
-```
-If there is already a prometheus server installed in a different namespace then inSustain can use this deployment by setting the following values in the HELM installation
+Since inSustain is a proprietary tool we are not hosting a public repository with the docker images. So the images are usually hosted on a Docker repository on the premises of the use case.
+
+Additionally since inSustain must monitor pods on possible other namespaces it requires a Service Account binded to a ClusterRole to list and discover pods.
+
+If there is already a prometheus server installed with a different release name then  inSustain can use this deployment by setting the value of the release name in the HELM installation using --set global.monitoring.labels.release=<prometheus-release-name>
+
+The custom Docker repository id can be set using --set global.image.repository=<repository-url>, a prefix can also be added using --set global.image.prefix=<prefix>.
+
+For a more detailed description of all the installation options please see our values.yaml file [here](insustain/values.yaml)
 
 ```bash
-helm install <helm-chart-name> insustain --create-namespace --namespace insustain --set backend.enabled=true --set frontend.enabled=true --set kepler.enabled=true --set prometheus.namespace= <prometheus-namespace> --set prometheus.servceName=<prometheus-name>
+helm install <helm-chart-name> insustain-1.0.0.tgz --create-namespace --namespace insustain --set backend.enabled=true
 ```
-
-# Accessing the cluster (WIP)
-To provide support for the inSustain app we are working on enbling a kubernetes pod with a NetBird client that can be used to connect securely using a private VPN.
-[NetBird](https://netbird.io/)
-
-# Backend
-Using the default values of the inSustain HELM chart the backend service is a kubernetes service using port 8089.
-This service can be inspected using kubernetes port-forwarding.
-
-# Frontend
-Using the default values of the inSustain HELM chart the frontend service is a kubernetes service using port 8080.
-This service can be inspected using kubernetes port-forwarding.
 
 # Architecture
 This is an architecture example of the inSustain application
