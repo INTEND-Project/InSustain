@@ -39,33 +39,41 @@ sudo chmod 600 /etc/docker/certs.d/89.133.95.6:5001/*
 
 ## Restart the docker service using
 
-```
+```bash
 sudo systemctl restart docker
 ```
 
 ## Authenticate
 Once the certificates have been placed on the appropiate directory and the docker service has been restarted then login can be attempted using the credentials provided (via email)
 
-```
+```bash
 docker login 89.133.95.6:5001 -u intend -p <password>
 ```
 
 ## Obtain docker images
 Once login is successful images can be downloaded from the repository. For instance to a minimal installation of the inSustain tool the backend iamge is necessary and can be downloaded using the command:
 
-```
+```bash
 docker save 89.133.95.6:5001/insustain/backend:latest -o backend.tar
 ```
 
 ## Import into K3s/K3s nodes
 Finally, the docker image can be imported into the K8s/K3s server nodes available for pod deployment. For instance, using the following command:
 
-```
+```bash
 sudo k3s ctr images import backend.tar
 ```
 
 # Install inSustain
 
+To install inSustain first download the helm chart from a release on this repository:
+
+```bash
+curl "https://github.com/INTEND-Project/InSustain/releases/download/v1.2.0/insustain-1.2.0.tgz" -o insustain-1.2.0.tgz
+```
+
+## Install the HELM chart
+Using the standard HELM chart downloaded on the previous step
 ```bash
 helm install <helm-chart-name> insustain
 ```
