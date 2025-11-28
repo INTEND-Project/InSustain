@@ -69,7 +69,8 @@ sudo k3s ctr images import backend.tar
 To install inSustain first download the helm chart from a release on this repository:
 
 ```bash
-curl "https://github.com/INTEND-Project/InSustain/releases/download/v1.2.0/insustain-1.2.0.tgz" -o insustain-1.2.0.tgz
+curl "https://github.com/INTEND-Project/InSustain/releases/download/v1.2.0/insustain-1.2.0.tgz" \
+-o insustain-1.2.0.tgz
 ```
 
 ## Install the HELM chart
@@ -80,7 +81,9 @@ helm install <helm-chart-name> insustain
 If there is already a prometheus server installed in a different namespace then inSustain can use this deployment by setting the following values in the HELM installation
 
 ```bash
-helm install <helm-chart-name> insustain --create-namespace --namespace insustain --set backend.enabled=true --set frontend.enabled=true --set kepler.enabled=true --set prometheus.namespace= <prometheus-namespace> --set prometheus.servceName=<prometheus-name>
+helm install <helm-chart-name> insustain --create-namespace --namespace insustain \
+--set prometheus.namespace=<prometheus-namespace> \
+--set prometheus.serviceName=<prometheus-name>
 ```
 
 ## Inspecting the pods
