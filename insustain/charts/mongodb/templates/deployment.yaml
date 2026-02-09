@@ -34,5 +34,14 @@ spec:
               mountPath: /data/db
       volumes:
         - name: mongo-data
+      {{- if .Values.persistence.enabled }}
+      {{- if .Values.persistence.existingClaim }}
           persistentVolumeClaim:
-            claimName: {{ .Values.persistence.storageClassName }}
+            claimName: {{ .Values.persistence.existingClaim }}
+      {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ include "mongodb.fullname" . }}-pvc
+      {{- end }}
+      {{- else }}
+          emptyDir: {}
+      {{- end }}

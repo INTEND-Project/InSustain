@@ -1,63 +1,144 @@
-# inSustain - A tool of the INTEND project
+# InSustain
 
-InSustain provide estimated energy metrics for cloud native deployments. The erngy metrics can be queried using our API or the webservice UI. Prediction of energy metrics is under development but it will be available soon. 
+Energy observability for Kubernetes workloads.
 
-# Pre-requisites
+## Overview
 
-- Kubernetes cluster v1.30.6+
-- HELM v3.17.1+
-- prometheus-operator v0.80+ (or any other equivalent Prometheus server)
-- [Kepler](https://sustainable-computing.io/) v0.8
+InSustain provides energy metrics and predictions for cloud-native applications:
+- Real-time energy consumption monitoring
+- Application registration and tracking
+- Historical analytics with flexible time ranges
+- ML-based energy prediction
 
-# Prometheus installation
+## Components
 
-We recommend the Kube Prometheus Stack helm chart, which includes the Node Exporter, Grafana and other helpful stuff to provide easy to operate end-to-end Kubernetes cluster monitoring with Prometheus using the Prometheus Operator.
+- **Backend** - REST API (port 8089)
+- **MongoDB** - Application metadata
+- **MLflow** - ML model platform
+- **PostgreSQL** - MLflow metadata
+- **MinIO** - MLflow artifacts
+- **Kepler** - Energy metrics collector
+
+## Prerequisites
+
+- Kubernetes v1.30.6+
+- Helm v3.17.1+
+- Prometheus Operator v0.80+
+- Kepler v0.8+
+
+## Quick Start
+
+### 1. Install Prometheus & Kepler
 
 ```bash
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-
-helm install monitoring prometheus-community/kube-prometheus-stack \
+helm install prometheus oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack \
+    --version 81.4.3 \
     --namespace monitoring \
+    --create-namespace \
     --wait
-```
 
-# Kepler installation
-We also recommend installing the Kepler chart on the monitoring namespace.
-
-```bash
 helm repo add kepler https://sustainable-computing-io.github.io/kepler-helm-chart
-helm install kepler kepler/kepler --version 0.8.0 --set serviceMonitor.enabled=true\
+helm install kepler kepler/kepler \
+    --version 0.8.0 \
+    --set serviceMonitor.enabled=true \
     --set serviceMonitor.labels.release=monitoring \
     --namespace monitoring \
     --wait
 ```
 
-# Install inSustain
+### 2. Install InSustain
 
-Since inSustain is a proprietary tool we are not hosting a public repository with the docker images. So the images are usually hosted on a Docker repository on the premises of the use case.
-
-Additionally since inSustain must monitor pods on possible other namespaces it requires a Service Account binded to a ClusterRole to list and discover pods.
-
-If there is already a prometheus server installed with a different release name then  inSustain can use this deployment by setting the value of the release name in the HELM installation using --set global.monitoring.labels.release=<prometheus-release-name>
-
-The custom Docker repository id can be set using --set global.image.repository=<repository-url>, a prefix can also be added using --set global.image.prefix=<prefix>.
-
-For a more detailed description of all the installation options please see our values.yaml file [here](insustain/values.yaml)
-
+**Option A: Download**
 ```bash
-helm install <helm-chart-name> insustain-1.0.0.tgz --create-namespace --namespace insustain --set backend.enabled=true
+curl -L "https://github.com/INTEND-Project/InSustain/archive/refs/tags/v1.2.0.tar.gz" -o insustain.tar.gz
+tar -xzf insustain.tar.gz
+cd InSustain-1.2.0
+./scripts/scripts/setup-insustain-k8s-native.sh -p <password>
 ```
 
-# inSustain workflow
+**Option B: Clone**
+```bash
+git clone --branch v1.2.0 --depth 1 https://github.com/INTEND-Project/InSustain.git
+cd InSustain
+./scripts/scripts/setup-insustain-k8s-native.sh -p <password>
+```
 
-The workflow of the inSustain application is represented on the following diagram
-![](workflow.png)
+Contact INTEND team for registry credentials.
 
-# Architecture
-This is an architecture example of the inSustain application
-![](arch.png)
+### 3. Access API
 
-# API Documentation
-All the documentation from our API is available at
-[docs](docs.html) please download it and open it in your browser
+```bash
+kubectl -n insustain port-forward svc/insustain-backend 8089:8089
+# Open: http://localhost:8089/docs
+```
+
+## Configuration
+
+### Basic Installation
+```bash
+helm install insustain insustain/ --namespace insustain
+```
+
+### With Multi-Namespace Monitoring
+```bash
+helm install insustain insustain/ \
+  --namespace insustain \
+  --set backend.rbac.create=true
+```
+
+This allows backend to discover pods across all namespaces.
+
+### Storage Configuration
+
+For production, enable persistent storage:
+```bash
+helm install insustain insustain/ \
+  --namespace insustain \
+  --set mongodb.persistence.enabled=true \
+  --set postgres.persistence.enabled=true \
+  --set minio.persistence.enabled=true
+```
+
+See [CONFIGURATION.md](CONFIGURATION.md) for all options.
+
+## Usage
+
+### Register Application
+```bash
+curl -X POST http://localhost:8089/nnwdaf-analyticsinfo/v1/application \
+  -H "Content-Type: application/json" \
+  -d '{"application-id": "my-app", "name": "My App"}'
+```
+
+### Query Metrics
+```bash
+curl "http://localhost:8089/nnwdaf-analyticsinfo/v1/analytics?\
+appIds=my-app&metricType=CPU_JOULES&offsetPeriod=-60"
+```
+
+See [API_GUIDE.md](API_GUIDE.md) for complete API reference.
+
+## Documentation
+
+- [QUICKSTART.md](QUICKSTART.md) - 5-minute setup
+- [INSTALL.md](INSTALL.md) - Detailed installation
+- [API_GUIDE.md](API_GUIDE.md) - API reference
+- [CONFIGURATION.md](CONFIGURATION.md) - Configuration options
+- [RBAC.md](RBAC.md) - Security and permissions
+
+## Architecture
+
+![Architecture](arch.png)
+
+InSustain integrates with Kepler for energy metrics, Prometheus for storage, and provides REST API for queries and predictions.
+
+## Support
+
+Contact INTEND project team for:
+- Docker registry credentials
+- Installation assistance
+- Technical support
+
+## License
+
+Proprietary - INTEND Project

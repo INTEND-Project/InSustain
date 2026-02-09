@@ -11,7 +11,7 @@ auth:
   database: monitoring
 
 persistence:
-  enabled: true
+  enabled: false
   size: 5Gi
   storageClassName: "mongo-pvc"
 

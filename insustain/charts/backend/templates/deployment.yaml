@@ -51,10 +51,18 @@ spec:
               containerPort: {{ .Values.service.pm.port }}
               protocol: TCP
           env:
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: {{ .Values.global.s3.endpoint }}
+            - name: AWS_ACCESS_KEY_ID
+              value: {{ .Values.global.minio.rootUser }}
+            - name: AWS_SECRET_ACCESS_KEY
+              value: {{ .Values.global.minio.rootPassword }}
+            - name: MLFLOW_S3_IGNORE_TLS
+              value: "true"
             - name: PROMETHEUS_URL
               value: "http://{{ .Values.prometheus.serviceName }}.{{ .Values.prometheus.namespace }}.svc.cluster.local:9090"
             - name: MLFLOW_URL
-              value: "http://{{ .Release.Name }}-mlflow-tracking.{{ .Release.Namespace }}.svc.cluster.local:80"
+              value: "http://{{ .Release.Name }}-mlflow.{{ .Release.Namespace }}.svc.cluster.local:5000"
             - name: MONGO_URL
               value: "{{ .Release.Name }}-mongodb.{{ .Release.Namespace }}.svc.cluster.local:27017"
             - name: MONGO_USERNAME

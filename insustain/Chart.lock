@@ -32,5 +32,14 @@ dependencies:
 - name: mongodb
   repository: file://charts/mongodb
   version: 0.1.0
-digest: sha256:26e47919520fabc22cfb32c6f8f306ef1c7ebfcb018d9e315a0da1900c6a29ad
-generated: "2025-10-09T15:12:51.164465632Z"
+- name: postgres
+  repository: file://charts/postgres
+  version: 0.1.0
+- name: minio
+  repository: https://charts.min.io/
+  version: 5.4.0
+- name: loadgen
+  repository: file://charts/loadgen
+  version: 0.1.0
+digest: sha256:8b32a24574fcfcc1789874c25f6139829dc649a15d712ed6276a749645f06216
+generated: "2026-02-04T12:59:46.465490211+01:00"

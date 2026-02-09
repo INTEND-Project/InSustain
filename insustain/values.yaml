@@ -1,7 +1,18 @@
 global:
   image:
-    repository: localhost:5000
-    prefix: insustain
+    repository: 89.133.95.6:5001
+  
+  minio:
+    rootUser: &rootUser "rootUser"
+    rootPassword: &rootPass "rootpass123"
+
+  s3:
+    endpoint: &s3Endpoint http://minio.insustain.svc.cluster.local:9000
+  
+  postgresql:
+    user: &postgresUser "user"
+    password: &postgresPassword "password"
+    database: &postgresDatabase "appdb"
     
   srs:
     http: 8080
@@ -17,6 +28,11 @@ global:
 
 backend:
   enabled: true
+  rbac:
+    create: false
+  serviceAccount:
+  # Specifies whether a service account should be created
+    create: false
   mongo:
     db: monitoring
   service:
@@ -49,7 +65,7 @@ frontend:
     name: frontend-configmap
 
 kepler:
-  enabled: true
+  enabled: false
   serviceMonitor:
     enabled: true
     labels:
@@ -65,27 +81,65 @@ mongodb:
     type: ClusterIP
     port: 27017
   persistence:
-    storageClassName: "mongo-pvc"
+    enabled: false
+
+postgres:
+  enabled: true
+  postgresUser: *postgresUser
+  postgresPassword: *postgresPassword
+  postgresDb: *postgresDatabase
+  persistence:
+    enabled: false
 
 mlflow:
+  image:
+    tag: 3.5.1
+  
+  log:
+    enabled: true
+    level: debug 
+
+  backendStore:
+    databaseConnectionCheck: true
+    postgres:
+      enabled: true
+      host: "postgres"            # your PostgreSQL service name
+      port: 5432
+      database: *postgresDatabase
+      user: *postgresUser
+      password: *postgresPassword
+
+  artifactRoot:
+    s3:
+      enabled: true
+      bucket: "mlflow"
+      awsAccessKeyId: *rootUser
+      awsSecretAccessKey: *rootPass
+
+  extraEnvVars:
+    MLFLOW_S3_ENDPOINT_URL: *s3Endpoint
+    MLFLOW_S3_IGNORE_TLS: "true"
+    MLFLOW_SERVER_ALLOWED_HOSTS: "*"
+
   service:
-    type: "NodePort"
+    type: ClusterIP
+    port: 5000
+
   auth:
     enabled: false
-  # minio:
-  #   auth:
-  #     rootUser: admin
-  #     rootPassword: adminpass
-  #   persistence:
-  #     existingClaim: "minio"
-  # postgresql:
-  #   auth:
-  #     user: "user"
-  #     rootPassword: "rootpass"
-  #     password: "userpass"
-  #   primary:
-  #     persistence:
-  #       existingClaim: "postgresql"
+  
+  # Disable embedded database charts - using external postgres and minio
+  postgresql:
+    enabled: false
+    primary:
+      persistence:
+        enabled: false
+  
+  mysql:
+    enabled: false
+    primary:
+      persistence:
+        enabled: false
 
 app-simulator:
   enabled: false
@@ -130,8 +184,8 @@ sysbench:
       database: benchdb
   workload: oltp_read_write
 
-srs:
-  enabled: true
+srs-server:
+  enabled: false
   image:
   repository: ossrs/srs
   tag: "6"
@@ -168,7 +222,7 @@ srs:
     portName: pm  # Name of the port defined in your service
 
 flask-streamer:
-  enabled: true
+  enabled: false
   image:
     # This sets the pull policy for images.
     pullPolicy: Always
@@ -193,8 +247,20 @@ flask-streamer:
     portName: main  # Name of the port defined in your service
     enabled: true
 
-locust:
+minio:
   enabled: true
+  resources:
+    requests:
+      memory: 1024Mi
+  replicas: 1
+  mode: standalone
+  rootUser: *rootUser
+  rootPassword: *rootPass
+  persistence:
+    enabled: false
+
+locust:
+  enabled: false
   image:
     repository: localhost:5000/insustain/locust
     # This sets the pull policy for images.
@@ -207,3 +273,18 @@ locust:
     # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
     nodePort: 31098
     metricsPort: 9646
+
+loadgen:
+  enabled: false
+  image:
+    repository: localhost:5000/insustain/loadgen
+    # This sets the pull policy for images.
+    pullPolicy: Always #IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: latest # it uses locustio/locust:2.39.
+  service:
+    # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+    type: NodePort #it was ClusterIP
+    # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
+    nodePort: 31088
+    port: 8800

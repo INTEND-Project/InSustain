@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InSustain API Examples</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #0082f0 0%, #00509e 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { font-size: 1.1em; opacity: 0.9; }
+        .content { padding: 40px; }
+        .api-section {
+            margin-bottom: 40px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .section-header {
+            background: #f5f5f5;
+            padding: 20px;
+            border-bottom: 2px solid #0082f0;
+        }
+        .section-header h2 { color: #333; font-size: 1.5em; }
+        .method-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.85em;
+            margin-right: 10px;
+        }
+        .method-get { background: #61affe; color: white; }
+        .method-post { background: #49cc90; color: white; }
+        .section-body { padding: 20px; }
+        .endpoint { font-family: 'Courier New', monospace; color: #0082f0; font-weight: bold; }
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .code-block pre { margin: 0; }
+        .description { color: #666; line-height: 1.6; margin: 15px 0; }
+        .try-button {
+            background: #0082f0;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 10px;
+        }
+        .try-button:hover { background: #00509e; }
+        .response-area {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+            display: none;
+        }
+        .response-area.show { display: block; }
+        .param-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .param-table th, .param-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .param-table th {
+            background: #f5f5f5;
+            font-weight: bold;
+        }
+        .param-name { font-family: 'Courier New', monospace; color: #0082f0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌱 InSustain API Examples</h1>
+            <p>Energy Monitoring & Prediction for Kubernetes</p>
+        </div>
+        
+        <div class="content">
+            <!-- Health Check -->
+            <div class="api-section">
+                <div class="section-header">
+                    <h2>
+                        <span class="method-badge method-get">GET</span>
+                        <span class="endpoint">/health</span>
+                    </h2>
+                </div>
+                <div class="section-body">
+                    <p class="description">Check API health status, Kubernetes permissions, and service configuration.</p>
+                    
+                    <h3>Example Request</h3>
+                    <div class="code-block"><pre>curl -X GET "http://localhost:8089/health"</pre></div>
+                    
+                    <h3>Example Response</h3>
+                    <div class="code-block"><pre>{
+  "status": "healthy",
+  "permissions": {
+    "has_k8s_access": true,
+    "can_list_pods": true,
+    "available_methods": ["k8s_labels", "microservices"],
+    "detection_time": "2025-02-09T10:30:00Z"
+  },
+  "configuration": {
+    "mode": "cluster",
+    "is_consistent": true,
+    "endpoints": {
+      "mongodb": "mongodb://insustain-mongodb:27017",
+      "mlflow": "http://insustain-mlflow:5000",
+      "prometheus": "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
+    }
+  }
+}</pre></div>
+                </div>
+            </div>
+
+            <!-- Register Application -->
+            <div class="api-section">
+                <div class="section-header">
+                    <h2>
+                        <span class="method-badge method-post">POST</span>
+                        <span class="endpoint">/application</span>
+                    </h2>
+                </div>
+                <div class="section-body">
+                    <p class="description">Register an application for energy monitoring. Use k8s_labels for dynamic discovery or microservices for static pod list.</p>
+                    
+                    <h3>Example 1: Using k8s_labels (Dynamic Discovery)</h3>
+                    <div class="code-block"><pre>curl -X POST "http://localhost:8089/application" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "0",
+    "name": "Backend API",
+    "k8s_labels": {
+      "app.kubernetes.io/name": "backend"
+    },
+    "namespace": "insustain"
+  }'</pre></div>
+                    
+                    <h3>Example 2: Using microservices (Static Pod List)</h3>
+                    <div class="code-block"><pre>curl -X POST "http://localhost:8089/application" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "1",
+    "name": "App Simulator",
+    "microservices": [
+      {"pod_name": "app-simulator-7d8f9c5b6-x4k2p", "node_name": "worker-1"},
+      {"pod_name": "app-simulator-7d8f9c5b6-m9n7q", "node_name": "worker-2"}
+    ]
+  }'</pre></div>
+                    
+                    <h3>Response (201 Created)</h3>
+                    <div class="code-block"><pre>{
+  "internal_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+  "id": "0",
+  "name": "Backend API",
+  "k8s_labels": {
+    "app.kubernetes.io/name": "backend"
+  },
+  "status": "unknown",
+  "last_check": "2025-02-09T10:30:00Z",
+  "monitoring_method": "k8s_labels"
+}</pre></div>
+                </div>
+            </div>
+
+            <!-- Get Application -->
+            <div class="api-section">
+                <div class="section-header">
+                    <h2>
+                        <span class="method-badge method-get">GET</span>
+                        <span class="endpoint">/application/{id}</span>
+                    </h2>
+                </div>
+                <div class="section-body">
+                    <p class="description">Retrieve details of a registered application.</p>
+                    
+                    <h3>Example Request</h3>
+                    <div class="code-block"><pre>curl -X GET "http://localhost:8089/application/0"</pre></div>
+                    
+                    <h3>Response (200 OK)</h3>
+                    <div class="code-block"><pre>{
+  "internal_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+  "id": "0",
+  "name": "Backend API",
+  "k8s_labels": {"app.kubernetes.io/name": "backend"},
+  "status": "unknown",
+  "last_check": "2025-02-09T10:30:00Z"
+}</pre></div>
+                </div>
+            </div>
+
+            <!-- Get Analytics -->
+            <div class="api-section">
+                <div class="section-header">
+                    <h2>
+                        <span class="method-badge method-get">GET</span>
+                        <span class="endpoint">/analytics</span>
+                    </h2>
+                </div>
+                <div class="section-body">
+                    <p class="description">Retrieve energy consumption metrics for a registered application.</p>
+                    
+                    <h3>Query Parameters</h3>
+                    <table class="param-table">
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Example</th>
+                        </tr>
+                        <tr>
+                            <td class="param-name">event-id</td>
+                            <td>string</td>
+                            <td>Metric type: CPU_JOULES, DRAM_JOULES, BPF_CPU_TIME_US</td>
+                            <td>CPU_JOULES</td>
+                        </tr>
+                        <tr>
+                            <td class="param-name">app_id</td>
+                            <td>string</td>
+                            <td>Application identifier</td>
+                            <td>0</td>
+                        </tr>
+                        <tr>
+                            <td class="param-name">ana-req</td>
+                            <td>JSON string</td>
+                            <td>Time range: {"offsetPeriod": -60} for last 60 seconds</td>
+                            <td>{"offsetPeriod": -60}</td>
+                        </tr>
+                    </table>
+                    
+                    <h3>Example Request</h3>
+                    <div class="code-block"><pre>curl -X GET "http://localhost:8089/analytics?event-id=CPU_JOULES&app_id=0&ana-req=%7B%22offsetPeriod%22%3A-60%7D"</pre></div>
+                    
+                    <h3>Response (200 OK)</h3>
+                    <div class="code-block"><pre>{
+  "analytics_subset": [
+    {
+      "timestamp": "2025-02-09T10:29:00Z",
+      "metric_value": 0.8008281904610115,
+      "metric_name": "kepler_container_joules_total",
+      "aggregation_level": "backend-pod-1",
+      "resource_id": "container-abc123"
+    },
+    {
+      "timestamp": "2025-02-09T10:29:30Z",
+      "metric_value": 0.8523456789012345,
+      "metric_name": "kepler_container_joules_total",
+      "aggregation_level": "backend-pod-1",
+      "resource_id": "container-abc123"
+    }
+  ]
+}</pre></div>
+                </div>
+            </div>
+
+            <!-- Predict -->
+            <div class="api-section">
+                <div class="section-header">
+                    <h2>
+                        <span class="method-badge method-get">GET</span>
+                        <span class="endpoint">/predict</span>
+                    </h2>
+                </div>
+                <div class="section-body">
+                    <p class="description">Get ML model prediction for energy consumption based on application parameters.</p>
+                    
+                    <h3>Example Request</h3>
+                    <div class="code-block"><pre>curl -X GET "http://localhost:8089/predict?app-params=%7B%22locust_users%22%3A40%7D&event-id=CPU_JOULES&app_id=0"</pre></div>
+                    
+                    <h3>Response (200 OK)</h3>
+                    <div class="code-block"><pre>{
+  "analytics_subset": [
+    {
+      "metric_value": 1.2345678901234567,
+      "metric_name": "kepler_container_joules_total",
+      "app_params": "locust_users"
+    }
+  ]
+}</pre></div>
+                </div>
+            </div>
+
+            <!-- WebSocket -->
+            <div class="api-section">
+                <div class="section-header">
+                    <h2>
+                        <span class="method-badge method-get">WS</span>
+                        <span class="endpoint">/ws</span>
+                    </h2>
+                </div>
+                <div class="section-body">
+                    <p class="description">WebSocket endpoint for real-time streaming of energy metrics.</p>
+                    
+                    <h3>JavaScript Example</h3>
+                    <div class="code-block"><pre>const ws = new WebSocket('ws://localhost:8089/ws');
+
+ws.onopen = () => {
+  // Send analytics request
+  ws.send(JSON.stringify({
+    payload: {
+      query: {
+        event_id: 'CPU_JOULES',
+        analyticsSubsets: '"appIds":["0"]',
+        offset: -60
+      },
+      id: 'request-1'
+    }
+  }));
+};
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Received:', data);
+};</pre></div>
+                </div>
+            </div>
+
+            <!-- Common Error Responses -->
+            <div class="api-section">
+                <div class="section-header">
+                    <h2>Common Error Responses</h2>
+                </div>
+                <div class="section-body">
+                    <h3>404 Not Found</h3>
+                    <div class="code-block"><pre>{
+  "error": "not_found",
+  "message": "Application with id '0' not found",
+  "guidance": "Verify the application ID is correct and the application has been registered"
+}</pre></div>
+                    
+                    <h3>403 Forbidden (Insufficient Permissions)</h3>
+                    <div class="code-block"><pre>{
+  "error": "permission_denied",
+  "message": "Kubernetes API access not available. Cannot use k8s_labels method without RBAC permissions.",
+  "guidance": "Re-register this application using the 'microservices' field with static pod names",
+  "available_methods": ["microservices"]
+}</pre></div>
+                    
+                    <h3>503 Service Unavailable</h3>
+                    <div class="code-block"><pre>{
+  "error": "external_service_error",
+  "message": "Unable to retrieve metrics from Prometheus for any of the 2 pods",
+  "guidance": "Check that Prometheus and Kepler are running. Verify pods are exposing metrics.",
+  "failed_pods": ["backend-pod-1", "backend-pod-2"]
+}</pre></div>
+                </div>
+            </div>
+
+            <!-- Quick Start Guide -->
+            <div class="api-section">
+                <div class="section-header">
+                    <h2>Quick Start Guide</h2>
+                </div>
+                <div class="section-body">
+                    <h3>1. Check API Health</h3>
+                    <div class="code-block"><pre>curl http://localhost:8089/health</pre></div>
+                    
+                    <h3>2. Register Your Application</h3>
+                    <div class="code-block"><pre>curl -X POST http://localhost:8089/application \
+  -H "Content-Type: application/json" \
+  -d '{"id":"0","name":"My App","k8s_labels":{"app":"myapp"}}'</pre></div>
+                    
+                    <h3>3. Get Energy Metrics</h3>
+                    <div class="code-block"><pre>curl "http://localhost:8089/analytics?event-id=CPU_JOULES&app_id=0&ana-req=%7B%22offsetPeriod%22%3A-60%7D"</pre></div>
+                    
+                    <h3>Available Metric Types</h3>
+                    <ul style="line-height: 2;">
+                        <li><strong>CPU_JOULES</strong> - CPU energy consumption in joules</li>
+                        <li><strong>DRAM_JOULES</strong> - DRAM energy consumption in joules</li>
+                        <li><strong>BPF_CPU_TIME_US</strong> - BPF CPU time in microseconds</li>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>
