@@ -173,7 +173,66 @@ See [RBAC.md](RBAC.md) for details.
 
 ---
 
+---
+
+## Manual Image Import (Optional)
+
+For pre-loading images before Helm deployment.
+
+### Scenario 1: Same Machine (Docker + Kubernetes)
+
+```bash
+./scripts/scripts/import-images.sh <password>
+```
+
+### Scenario 2: Same Machine (No Docker)
+
+Use skopeo instead:
+```bash
+# Install skopeo
+sudo apt install skopeo
+
+# Download and import
+./scripts/scripts/import-images.sh --use-skopeo <password>
+```
+
+### Scenario 3: Separate Machines
+
+**On machine with Docker:**
+```bash
+./scripts/scripts/download-images.sh <password>
+```
+
+**Transfer `insustain-images/` directory to Kubernetes node**
+
+**On Kubernetes node:**
+```bash
+./scripts/scripts/load-images.sh
+```
+
+### Deploy
+
+After importing images:
+```bash
+helm install insustain insustain/ --set backend.image.pullPolicy=IfNotPresent
+```
+
+---
+
+---
+
 ## Troubleshooting
+
+**Test registry access first:**
+```bash
+./scripts/scripts/test-registry-access.sh <password>
+```
+
+This diagnostic script checks:
+- Network connectivity to registry
+- Certificate configuration
+- Authentication
+- Runtime detection and configuration
 
 **Pods not starting:**
 ```bash
@@ -183,8 +242,53 @@ kubectl -n insustain logs <pod-name>
 
 **Image pull errors:**
 - Verify credentials with INTEND team
-- Check certificate location
-- Ensure registry is accessible
+- Check certificate is installed correctly for your runtime
+- Ensure registry is accessible: `ping 89.133.95.6`
+- Test manual pull with your runtime's CLI
+
+**Certificate/TLS errors when pulling images:**
+
+For K3s:
+```bash
+# Check registries config
+cat /etc/rancher/k3s/registries.yaml
+
+# Verify certificate path is correct
+ls -la $(pwd)/certs/docker_ca.crt
+
+# Restart K3s after config changes
+sudo systemctl restart k3s
+```
+
+For containerd:
+```bash
+# Check certificate directory
+ls -la /etc/containerd/certs.d/89.133.95.6:5001/
+
+# Verify certificate is readable
+sudo cat /etc/containerd/certs.d/89.133.95.6:5001/ca.crt
+
+# Restart containerd
+sudo systemctl restart containerd
+```
+
+For CRI-O:
+```bash
+# Check registries config
+cat /etc/containers/registries.conf
+
+# Verify certificate path
+cat $(pwd)/certs/docker_ca.crt
+
+# Restart CRI-O
+sudo systemctl restart crio
+```
+
+**Authentication errors:**
+- Double-check username is "intend"
+- Verify password with INTEND team
+- Ensure no extra spaces in credentials
+- Try escaping special characters in password
 
 **No metrics:**
 - Wait 5-10 minutes for data collection

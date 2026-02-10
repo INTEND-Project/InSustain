@@ -101,6 +101,47 @@ helm install insustain insustain/ \
 
 See [CONFIGURATION.md](CONFIGURATION.md) for all options.
 
+## Image Management
+
+InSustain uses a private registry. Two options:
+
+### Option 1: imagePullSecrets (Recommended)
+
+Kubernetes pulls images automatically:
+```bash
+./scripts/scripts/setup-insustain-k8s-native.sh -p <password>
+```
+
+### Option 2: Pre-load Images
+
+Download and import before deployment:
+
+**Same machine (Docker + Kubernetes):**
+```bash
+./scripts/scripts/import-images.sh <password>
+```
+
+**Same machine (no Docker, use skopeo):**
+```bash
+./scripts/scripts/import-images.sh --use-skopeo <password>
+```
+
+**Separate machines:**
+```bash
+# On machine with Docker:
+./scripts/scripts/download-images.sh <password>
+
+# Transfer insustain-images/ directory to Kubernetes node
+
+# On Kubernetes node:
+./scripts/scripts/load-images.sh
+```
+
+Then deploy:
+```bash
+helm install insustain insustain/ --set backend.image.pullPolicy=IfNotPresent
+```
+
 ## Usage
 
 ### Register Application
