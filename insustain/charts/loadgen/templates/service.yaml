@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "loadgen.fullname" . }}
+  labels:
+    {{- include "loadgen.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 8800
+      nodePort: 31088
+      protocol: TCP
+  selector:
+    {{- include "loadgen.selectorLabels" . | nindent 4 }}
