@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "postgresql.fullname" . }}
+  labels:
+    app: {{ include "postgresql.name" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "postgresql.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "postgresql.name" . }}
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              value: {{ if and .Values.global .Values.global.postgresql }}{{ .Values.global.postgresql.user | quote }}{{ else }}{{ .Values.postgresUser | quote }}{{ end }}
+            - name: POSTGRES_PASSWORD
+              value: {{ if and .Values.global .Values.global.postgresql }}{{ .Values.global.postgresql.password | quote }}{{ else }}{{ .Values.postgresPassword | quote }}{{ end }}
+            - name: POSTGRES_DB
+              value: {{ if and .Values.global .Values.global.postgresql }}{{ .Values.global.postgresql.database | quote }}{{ else }}{{ .Values.postgresDb | quote }}{{ end }}
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+              {{- if .Values.persistence.enabled }}
+              subPath: pgdata
+              {{- end }}
+      volumes:
+        - name: postgres-data
+      {{- if .Values.persistence.enabled }}
+      {{- if .Values.persistence.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim }}
+      {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ include "postgresql.fullname" . }}-pvc
+      {{- end }}
+      {{- else }}
+          emptyDir: {}
+      {{- end }}

@@ -1,0 +1,20 @@
+image:
+  repository: postgres
+  tag: "16"
+  pullPolicy: IfNotPresent
+
+# PostgreSQL credentials - can be overridden by global values
+postgresUser: user
+postgresPassword: password
+postgresDb: appdb
+
+persistence:
+  enabled: false
+  size: 5Gi
+  storageClassName: "postgres-pvc"
+
+service:
+  type: ClusterIP
+  port: 5432
+
+resources: {}
