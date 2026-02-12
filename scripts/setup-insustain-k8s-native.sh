@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# inSustain Setup Script - Kubernetes Native Approach
-# This script uses Kubernetes imagePullSecrets instead of pre-importing images
-# This is the recommended approach for production Kubernetes clusters
+# inSustain Setup Script - Pre-imported Images Approach
+# This script assumes images have been pre-imported using import-backend-image.sh
+# This is the recommended approach for air-gapped or offline deployments
 
 # Color codes
 RED='\033[0;31m'
@@ -12,11 +12,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Configuration
-DOCKER_REGISTRY_AUTH="https://89.133.95.6:5001"  # For authentication
-DOCKER_REGISTRY="89.133.95.6:5001"               # For image references
-DOCKER_USER="intend"
 NAMESPACE="insustain"
-SECRET_NAME="insustain-registry-secret"
 
 # Variables set during execution
 PROMETHEUS_RELEASE=""
@@ -65,64 +61,52 @@ check_prerequisites() {
     print_success "All prerequisites met"
 }
 
-setup_registry_certificate() {
-    print_header "Setting Up Registry Certificate in Kubernetes"
+check_backend_image() {
+    print_header "Checking Backend Image"
     
-    local cert_file="certs/docker_ca.crt"
+    local runtime=""
+    local image_found=false
     
-    if [ ! -f "$cert_file" ]; then
-        print_error "Certificate file not found: $cert_file"
+    # Detect runtime
+    if command -v k3s >/dev/null 2>&1 && k3s kubectl get nodes >/dev/null 2>&1; then
+        runtime="k3s"
+        if sudo k3s ctr images ls | grep -q "89.133.95.6:5001/insustain/backend:latest"; then
+            image_found=true
+        fi
+    elif command -v ctr >/dev/null 2>&1 && sudo ctr -n k8s.io version >/dev/null 2>&1; then
+        runtime="containerd"
+        if sudo ctr -n k8s.io images ls | grep -q "89.133.95.6:5001/insustain/backend:latest"; then
+            image_found=true
+        fi
+    elif command -v crictl >/dev/null 2>&1 && sudo crictl version >/dev/null 2>&1; then
+        runtime="crio"
+        if sudo crictl images | grep -q "89.133.95.6:5001/insustain/backend:latest"; then
+            image_found=true
+        fi
+    fi
+    
+    if [ "$image_found" = true ]; then
+        print_success "Backend image found in $runtime"
+    else
+        print_error "Backend image not found in container runtime"
+        echo
+        print_info "Please import the backend image first:"
+        echo "  ./scripts/import-backend-image.sh"
+        echo
         exit 1
     fi
+}
+
+setup_namespace() {
+    print_header "Setting Up Namespace"
     
     # Create namespace if it doesn't exist
     if ! kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
         print_info "Creating namespace $NAMESPACE..."
         kubectl create namespace "$NAMESPACE"
-    fi
-    
-    # Create ConfigMap with CA certificate
-    print_info "Creating certificate ConfigMap..."
-    kubectl create configmap registry-ca-cert \
-        --from-file=ca.crt="$cert_file" \
-        --namespace "$NAMESPACE" \
-        --dry-run=client -o yaml | kubectl apply -f -
-    
-    print_success "Certificate ConfigMap created"
-}
-
-create_image_pull_secret() {
-    print_header "Creating Kubernetes Image Pull Secret"
-    
-    # Check for password in order: argument, environment variable, prompt
-    if [ -z "$DOCKER_PASSWORD" ]; then
-        if [ -n "$1" ]; then
-            DOCKER_PASSWORD="$1"
-            print_info "Using password from argument"
-        else
-            read -sp "Enter Docker registry password: " DOCKER_PASSWORD
-            echo
-        fi
+        print_success "Namespace created"
     else
-        print_info "Using password from environment variable"
-    fi
-    
-    # Delete existing secret if present
-    kubectl delete secret "$SECRET_NAME" -n "$NAMESPACE" 2>/dev/null || true
-    
-    # Create docker-registry secret
-    print_info "Creating image pull secret..."
-    kubectl create secret docker-registry "$SECRET_NAME" \
-        --docker-server="$DOCKER_REGISTRY_AUTH" \
-        --docker-username="$DOCKER_USER" \
-        --docker-password="$DOCKER_PASSWORD" \
-        --namespace "$NAMESPACE"
-    
-    if [ $? -eq 0 ]; then
-        print_success "Image pull secret created"
-    else
-        print_error "Failed to create image pull secret"
-        exit 1
+        print_success "Namespace already exists"
     fi
 }
 
@@ -162,11 +146,7 @@ install_prometheus() {
     print_info "Installing kube-prometheus-stack version ${PROMETHEUS_VERSION}..."
     print_info "This includes Prometheus, Grafana, Node Exporter, and more"
     
-    # Add helm repo
-    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
-    helm repo update >/dev/null 2>&1
-    
-    # Install with specific version
+    # Install with specific version (repo already added in add_helm_repositories)
     if helm install prometheus prometheus-community/kube-prometheus-stack \
         --version "$PROMETHEUS_VERSION" \
         --namespace monitoring \
@@ -270,20 +250,39 @@ setup_kubernetes() {
     fi
 }
 
+add_helm_repositories() {
+    print_header "Adding Required Helm Repositories"
+    
+    print_info "Adding Helm repositories..."
+    
+    # Add all required repositories
+    helm repo add kepler https://sustainable-computing-io.github.io/kepler-helm-chart 2>/dev/null || true
+    helm repo add community-charts https://community-charts.github.io/helm-charts 2>/dev/null || true
+    helm repo add bitnami https://charts.bitnami.com/bitnami 2>/dev/null || true
+    helm repo add minio https://charts.min.io/ 2>/dev/null || true
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
+    
+    print_info "Updating Helm repositories..."
+    helm repo update >/dev/null 2>&1
+    
+    print_success "Helm repositories configured"
+}
+
 deploy_insustain() {
     print_header "Deploying inSustain"
     
+    # Add required Helm repositories
+    add_helm_repositories
+    
     # Update helm dependencies
-    print_info "Updating Helm dependencies..."
-    helm dependency update insustain/
+    print_info "Building Helm dependencies..."
+    helm dependency build insustain/
     
     # Build helm install/upgrade command
     local helm_cmd="helm"
     local helm_args=(
         "--namespace" "$NAMESPACE"
         "--set" "backend.image.pullPolicy=IfNotPresent"
-        "--set" "backend.imagePullSecrets[0].name=$SECRET_NAME"
-        "--set" "global.image.repository=$DOCKER_REGISTRY"
         "--set" "global.monitoring.labels.release=$PROMETHEUS_RELEASE"
     )
     
@@ -307,6 +306,12 @@ deploy_insustain() {
         if [ "$KEPLER_INSTALLED" = true ]; then
             print_info "Using existing Kepler installation"
         fi
+    fi
+    
+    # Add nodeSelector if specified
+    if [ -n "$2" ]; then
+        helm_args+=("--set" "backend.nodeSelector.kubernetes\.io/hostname=$2")
+        print_info "Backend will be scheduled on node: $2"
     fi
     
     # Check if already installed
@@ -391,15 +396,11 @@ show_access_info() {
 
 main() {
     # Parse arguments
-    local PASSWORD_ARG=""
     local ENABLE_FULL_RBAC=false
+    local NODE_SELECTOR=""
     
     while [[ $# -gt 0 ]]; do
         case $1 in
-            -p|--password)
-                PASSWORD_ARG="$2"
-                shift 2
-                ;;
             -y|--yes)
                 AUTO_YES=true
                 shift
@@ -408,27 +409,34 @@ main() {
                 ENABLE_FULL_RBAC=true
                 shift
                 ;;
+            -n|--node)
+                NODE_SELECTOR="$2"
+                shift 2
+                ;;
             -h|--help)
                 echo "Usage: $0 [OPTIONS]"
                 echo ""
                 echo "Options:"
-                echo "  -p, --password PASSWORD    Docker registry password"
-                echo "  -y, --yes                  Auto-answer yes to prompts (includes image import)"
+                echo "  -y, --yes                  Auto-answer yes to prompts"
+                echo "  -n, --node NODE_NAME       Schedule backend on specific node (nodeSelector)"
                 echo "  --enable-full-rbac         Enable full cluster RBAC permissions for backend"
                 echo "                             (allows listing pods across all namespaces)"
                 echo "  -h, --help                 Show this help message"
                 echo ""
+                echo "Prerequisites:"
+                echo "  • Backend image must be imported first using:"
+                echo "    ./scripts/import-backend-image.sh"
+                echo ""
                 echo "Features:"
-                echo "  • Creates Kubernetes imagePullSecret for registry authentication"
-                echo "  • Optionally imports backend image directly to K3s (bypasses registry issues)"
                 echo "  • Installs/checks kube-prometheus-stack and Kepler"
                 echo "  • Deploys inSustain via Helm"
+                echo "  • Uses pre-imported images (no registry authentication needed)"
                 echo ""
                 echo "Examples:"
-                echo "  $0 --password mypassword"
-                echo "  $0 -p mypassword -y"
-                echo "  $0 -p mypassword --enable-full-rbac"
-                echo "  DOCKER_PASSWORD=mypassword $0"
+                echo "  $0"
+                echo "  $0 -y"
+                echo "  $0 --node intend-cluster01-master"
+                echo "  $0 -y --enable-full-rbac"
                 exit 0
                 ;;
             *)
@@ -439,30 +447,26 @@ main() {
         esac
     done
     
-    # Set password if provided as argument
-    if [ -n "$PASSWORD_ARG" ]; then
-        export DOCKER_PASSWORD="$PASSWORD_ARG"
-    fi
-    
     echo
-    print_header "inSustain Setup Script (Kubernetes Native)"
+    print_header "inSustain Setup Script"
     echo
-    print_info "This script uses Kubernetes imagePullSecrets (recommended approach)"
-    print_info "With optional direct image import to K3s (bypasses registry issues)"
+    print_info "This script deploys inSustain using pre-imported images"
+    echo
+    echo "Prerequisites:"
+    echo "  ⚠️  Backend image must be imported first:"
+    echo "     ./scripts/import-backend-image.sh"
     echo
     echo "Benefits:"
+    echo "  ✅ No registry authentication needed"
+    echo "  ✅ Works in air-gapped environments"
+    echo "  ✅ Faster deployment (no image pulls)"
     echo "  ✅ No Docker required on K8s nodes"
-    echo "  ✅ Optional direct image import (avoids registry HTTP/HTTPS issues)"
-    echo "  ✅ Works with multi-node clusters"
-    echo "  ✅ Kubernetes handles image distribution"
-    echo "  ✅ No server restarts needed"
     echo
     print_info "This script will:"
-    echo "  1. Check/install kube-prometheus-stack (Prometheus + Grafana + more)"
-    echo "  2. Check/install Kepler (energy metrics)"
-    echo "  3. Create Kubernetes imagePullSecret for registry access"
-    echo "  4. Optionally import backend image directly to K3s"
-    echo "  5. Deploy inSustain with Helm"
+    echo "  1. Verify backend image is imported"
+    echo "  2. Check/install kube-prometheus-stack (Prometheus + Grafana)"
+    echo "  3. Check/install Kepler (energy metrics)"
+    echo "  4. Deploy inSustain with Helm"
     echo
     
     if [ "$AUTO_YES" = false ]; then
@@ -478,11 +482,10 @@ main() {
     fi
     
     check_prerequisites
-    setup_registry_certificate
-    create_image_pull_secret "$PASSWORD_ARG"
-      
+    check_backend_image
+    setup_namespace
     setup_kubernetes
-    deploy_insustain "$ENABLE_FULL_RBAC"
+    deploy_insustain "$ENABLE_FULL_RBAC" "$NODE_SELECTOR"
     show_access_info
     
     echo
@@ -493,6 +496,10 @@ main() {
     echo "  2. Check API documentation at http://localhost:8089/docs"
     echo "  3. Explore Grafana dashboards for monitoring"
     echo "  4. Review logs if any issues: kubectl logs -n $NAMESPACE -l app.kubernetes.io/name=backend"
+    echo
+    print_info "To enable additional components (frontend, loadgen, etc.):"
+    echo "  1. Import their images using import scripts"
+    echo "  2. Upgrade deployment: helm upgrade insustain insustain/ -n insustain --set <component>.enabled=true"
     echo
 }
 
