@@ -16,11 +16,30 @@ NC='\033[0m'
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 cd "$GIT_ROOT"
 
-REGISTRY="89.133.95.6:5001"
+# Find git repository root
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+cd "$GIT_ROOT"
+
+DEFAULT_REGISTRY="89.133.95.6:5001"
+HARBOR_REGISTRY="registry.gate-ai.eu"
+
+# Default to local registry
+USE_HARBOR=false
+REGISTRY="$DEFAULT_REGISTRY"
 USER="intend"
-IMAGE="insustain/backend:latest"
 CERT_FILE="certs/docker_ca.crt"
 IMAGE_DIR="insustain-images"
+
+# Image name mapping (will be set based on registry)
+declare -A IMAGE_MAP_LOCAL=(
+    ["backend"]="insustain/backend:latest"
+    ["nginx-log-parser"]="insustain/nginx-log-parser:latest"
+)
+
+declare -A IMAGE_MAP_HARBOR=(
+    ["backend"]="intend/insustain-backend:latest"
+    ["nginx-log-parser"]="intend/insustain-nginx-log-parser:latest"
+)
 
 print_info() { echo -e "${YELLOW}[INFO]${NC} $1"; }
 print_success() { echo -e "${GREEN}[✓]${NC} $1"; }
@@ -29,18 +48,24 @@ print_step() { echo -e "${BLUE}▶${NC} $1"; }
 
 show_help() {
     cat << EOF
-Import InSustain Backend Image to Kubernetes
+Import InSustain Images to Kubernetes
 
-Usage: $0 [OPTIONS]
+Usage: $0 [OPTIONS] [IMAGE_NAMES...]
 
-Imports backend image to Kubernetes runtime (K3s, containerd, or CRI-O).
+Imports backend and nginx-log-parser images to Kubernetes runtime (K3s, containerd, or CRI-O).
 Can import from tar file or pull directly from registry.
 
 Options:
   -m, --method METHOD       Import method: tar or pull (default: auto-detect)
   -p, --password PASSWORD   Registry password (required for pull method)
   -d, --dir DIR            Image directory (default: insustain-images)
+  --harbor                 Use Harbor registry (registry.gate-ai.eu)
+  --local                  Use local registry (default: 89.133.95.6:5001)
   -h, --help               Show this help
+
+Image Names:
+  backend, nginx-log-parser
+  If no image specified, all images will be imported
 
 Methods:
   tar   - Import from tar file (offline, no registry access needed)
@@ -48,11 +73,17 @@ Methods:
   auto  - Auto-detect: use tar if available, otherwise pull
 
 Examples:
-  # Import from tar file (default if tar exists)
+  # Import all images from tar files (default if tar exists)
   $0
 
-  # Force pull from registry
-  $0 --method pull -p mypassword
+  # Import backend only
+  $0 backend
+
+  # Import nginx-log-parser only
+  $0 nginx-log-parser
+
+  # Force pull from Harbor registry
+  $0 --harbor --method pull -p mypassword
 
   # Import from custom directory
   $0 --dir /path/to/images
@@ -90,14 +121,15 @@ detect_runtime() {
 
 import_from_tar() {
     local runtime=$1
-    local tar_file="${IMAGE_DIR}/$(echo $IMAGE | tr '/' '-' | tr ':' '-').tar"
+    local image=$2
+    local tar_file="${IMAGE_DIR}/$(echo $image | tr '/' '-' | tr ':' '-').tar"
     
     if [ ! -f "$tar_file" ]; then
         print_error "Tar file not found: $tar_file"
         return 1
     fi
     
-    print_step "Importing from tar file..."
+    print_step "Importing $image from tar file..."
     print_info "File: $tar_file"
     
     case $runtime in
@@ -118,14 +150,15 @@ import_from_tar() {
 pull_from_registry() {
     local runtime=$1
     local password=$2
-    local full_image="${REGISTRY}/${IMAGE}"
+    local image=$3
+    local full_image="${REGISTRY}/${image}"
     
     if [ -z "$password" ]; then
         print_error "Password required for pull method"
         return 1
     fi
     
-    print_step "Pulling from registry..."
+    print_step "Pulling $image from registry..."
     print_info "Image: $full_image"
     
     case $runtime in
@@ -145,9 +178,10 @@ pull_from_registry() {
 
 verify_image() {
     local runtime=$1
-    local full_image="${REGISTRY}/${IMAGE}"
+    local image=$2
+    local full_image="${REGISTRY}/${image}"
     
-    print_step "Verifying image..."
+    print_step "Verifying $image..."
     
     local found=false
     case $runtime in
@@ -180,6 +214,7 @@ verify_image() {
 main() {
     local METHOD="auto"
     local PASSWORD=""
+    local TARGET_IMAGES=()
     
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -196,19 +231,59 @@ main() {
                 IMAGE_DIR="$2"
                 shift 2
                 ;;
+            --harbor)
+                USE_HARBOR=true
+                REGISTRY="$HARBOR_REGISTRY"
+                shift
+                ;;
+            --local)
+                USE_HARBOR=false
+                REGISTRY="$DEFAULT_REGISTRY"
+                shift
+                ;;
             -h|--help)
                 show_help
                 ;;
-            *)
+            -*)
                 print_error "Unknown option: $1"
                 echo "Use -h or --help for usage"
                 exit 1
                 ;;
+            *)
+                # Image name argument - use appropriate map
+                if [ "$USE_HARBOR" = true ]; then
+                    if [[ -n "${IMAGE_MAP_HARBOR[$1]}" ]]; then
+                        TARGET_IMAGES+=("${IMAGE_MAP_HARBOR[$1]}")
+                    else
+                        print_error "Unknown image: $1 (use: backend, nginx-log-parser)"
+                        exit 1
+                    fi
+                else
+                    if [[ -n "${IMAGE_MAP_LOCAL[$1]}" ]]; then
+                        TARGET_IMAGES+=("${IMAGE_MAP_LOCAL[$1]}")
+                    else
+                        print_error "Unknown image: $1 (use: backend, nginx-log-parser)"
+                        exit 1
+                    fi
+                fi
+                shift
+                ;;
         esac
     done
     
+    # If no images specified, import all
+    if [ ${#TARGET_IMAGES[@]} -eq 0 ]; then
+        if [ "$USE_HARBOR" = true ]; then
+            TARGET_IMAGES=("${IMAGE_MAP_HARBOR[@]}")
+        else
+            TARGET_IMAGES=("${IMAGE_MAP_LOCAL[@]}")
+        fi
+        print_info "No images specified, importing all images"
+    fi
+    
     echo
-    print_info "InSustain Backend Image Import"
+    print_info "InSustain Images Import"
+    print_info "Registry: $REGISTRY"
     print_info "Working directory: $(pwd)"
     echo
     
@@ -218,15 +293,23 @@ main() {
     print_success "Runtime: $runtime"
     echo
     
-    # Determine method
+    # Determine method (check if any tar file exists)
     if [ "$METHOD" = "auto" ]; then
-        local tar_file="${IMAGE_DIR}/$(echo $IMAGE | tr '/' '-' | tr ':' '-').tar"
-        if [ -f "$tar_file" ]; then
+        local has_tar=false
+        for image in "${TARGET_IMAGES[@]}"; do
+            local tar_file="${IMAGE_DIR}/$(echo $image | tr '/' '-' | tr ':' '-').tar"
+            if [ -f "$tar_file" ]; then
+                has_tar=true
+                break
+            fi
+        done
+        
+        if [ "$has_tar" = true ]; then
             METHOD="tar"
-            print_info "Auto-detected method: tar (file found)"
+            print_info "Auto-detected method: tar (files found)"
         else
             METHOD="pull"
-            print_info "Auto-detected method: pull (no tar file)"
+            print_info "Auto-detected method: pull (no tar files)"
         fi
     fi
     
@@ -243,16 +326,8 @@ main() {
     
     echo
     
-    # Import image
-    if [ "$METHOD" = "tar" ]; then
-        if import_from_tar "$runtime"; then
-            print_success "Import successful"
-        else
-            print_error "Import failed"
-            exit 1
-        fi
-    else
-        # Get password if not provided
+    # Get password if pull method
+    if [ "$METHOD" = "pull" ]; then
         if [ -z "$PASSWORD" ]; then
             if [ -n "$REGISTRY_PASSWORD" ]; then
                 PASSWORD="$REGISTRY_PASSWORD"
@@ -262,26 +337,38 @@ main() {
                 echo
             fi
         fi
-        
-        if pull_from_registry "$runtime" "$PASSWORD"; then
-            print_success "Pull successful"
-        else
-            print_error "Pull failed"
-            echo
-            print_info "Troubleshooting:"
-            echo "  - Verify registry certificate is configured"
-            echo "  - Check password is correct"
-            echo "  - See INSTALL.md for certificate setup"
-            exit 1
-        fi
     fi
+    
+    # Import all images
+    local failed=0
+    for image in "${TARGET_IMAGES[@]}"; do
+        echo
+        print_info "Processing: $image"
+        
+        if [ "$METHOD" = "tar" ]; then
+            if import_from_tar "$runtime" "$image"; then
+                print_success "Import successful: $image"
+            else
+                print_error "Import failed: $image"
+                failed=1
+            fi
+        else
+            if pull_from_registry "$runtime" "$PASSWORD" "$image"; then
+                print_success "Pull successful: $image"
+            else
+                print_error "Pull failed: $image"
+                failed=1
+            fi
+        fi
+        
+        # Verify
+        verify_image "$runtime" "$image" || failed=1
+    done
     
     echo
     
-    # Verify
-    if verify_image "$runtime"; then
-        echo
-        print_success "Image ready in Kubernetes!"
+    if [ $failed -eq 0 ]; then
+        print_success "All images ready in Kubernetes!"
         echo
         print_info "Next steps:"
         echo "  1. Deploy InSustain:"
@@ -290,6 +377,14 @@ main() {
         echo "       --set backend.image.pullPolicy=IfNotPresent"
         echo
     else
+        print_error "Some imports failed"
+        if [ "$METHOD" = "pull" ]; then
+            echo
+            print_info "Troubleshooting:"
+            echo "  - Verify registry certificate is configured"
+            echo "  - Check password is correct"
+            echo "  - See INSTALL.md for certificate setup"
+        fi
         exit 1
     fi
 }

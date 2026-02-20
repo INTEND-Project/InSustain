@@ -15,11 +15,30 @@ NC='\033[0m'
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 cd "$GIT_ROOT"
 
-REGISTRY="89.133.95.6:5001"
+# Find git repository root
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+cd "$GIT_ROOT"
+
+DEFAULT_REGISTRY="89.133.95.6:5001"
+HARBOR_REGISTRY="registry.gate-ai.eu"
+
+# Default to local registry
+USE_HARBOR=false
+REGISTRY="$DEFAULT_REGISTRY"
 USER="intend"
-IMAGE="insustain/backend:latest"
 CERT_FILE="certs/docker_ca.crt"
 OUTPUT_DIR="insustain-images"
+
+# Image name mapping (will be set based on registry)
+declare -A IMAGE_MAP_LOCAL=(
+    ["backend"]="insustain/backend:latest"
+    ["nginx-log-parser"]="insustain/nginx-log-parser:latest"
+)
+
+declare -A IMAGE_MAP_HARBOR=(
+    ["backend"]="intend/insustain-backend:latest"
+    ["nginx-log-parser"]="intend/insustain-nginx-log-parser:latest"
+)
 
 print_info() { echo -e "${YELLOW}[INFO]${NC} $1"; }
 print_success() { echo -e "${GREEN}[✓]${NC} $1"; }
@@ -28,29 +47,40 @@ print_step() { echo -e "${BLUE}▶${NC} $1"; }
 
 show_help() {
     cat << EOF
-Download InSustain Backend Image
+Download InSustain Images
 
-Usage: $0 [OPTIONS]
+Usage: $0 [OPTIONS] [IMAGE_NAMES...]
 
-Downloads the backend image from private registry using Docker or Skopeo.
+Downloads backend and nginx-log-parser images from private registry using Docker or Skopeo.
 
 Options:
   -p, --password PASSWORD    Registry password (or use REGISTRY_PASSWORD env var)
   -t, --tool TOOL           Force tool: docker or skopeo (auto-detect by default)
   -o, --output DIR          Output directory (default: insustain-images)
+  --harbor                  Download from Harbor registry (registry.gate-ai.eu)
+  --local                   Download from local registry (default: 89.133.95.6:5001)
   -h, --help                Show this help
 
+Image Names:
+  backend, nginx-log-parser
+  If no image specified, all images will be downloaded
+
 Examples:
-  $0 -p mypassword
-  $0 --tool skopeo -p mypassword
+  $0 -p mypassword                    # Download all images from local registry
+  $0 -p mypassword backend            # Download backend only from local
+  $0 --harbor -p mypassword           # Download all from Harbor
+  $0 --harbor -p mypassword nginx-log-parser
+  $0 --tool skopeo -p mypassword backend nginx-log-parser
   REGISTRY_PASSWORD=mypassword $0
 
 Output:
-  Creates directory with: insustain-backend-latest.tar
+  Creates directory with: 
+    - insustain-backend-latest.tar (or intend-insustain-backend-latest.tar for Harbor)
+    - insustain-nginx-log-parser-latest.tar (or intend-insustain-nginx-log-parser-latest.tar for Harbor)
 
 Next Steps:
   Transfer the output directory to your Kubernetes node and run:
-    ./scripts/import-backend-image.sh
+    ./scripts/import-backend-image.sh [--harbor]
 
 EOF
     exit 0
@@ -88,64 +118,50 @@ detect_tool() {
 }
 
 download_with_docker() {
-    local full_image="${REGISTRY}/${IMAGE}"
-    local tar_file="${OUTPUT_DIR}/$(echo $IMAGE | tr '/' '-' | tr ':' '-').tar"
+    local image=$1
+    local full_image="${REGISTRY}/${image}"
+    local tar_file="${OUTPUT_DIR}/$(echo $image | tr '/' '-' | tr ':' '-').tar"
     
-    print_step "Configuring Docker certificate..."
-    local cert_dir="/etc/docker/certs.d/${REGISTRY}"
-    sudo mkdir -p "$cert_dir"
-    sudo cp "$CERT_FILE" "$cert_dir/ca.crt"
-    
-    if systemctl is-active --quiet docker; then
-        print_info "Restarting Docker daemon..."
-        sudo systemctl restart docker
-        sleep 2
-    fi
-    
-    print_step "Logging into registry..."
-    echo "$PASSWORD" | docker login "$REGISTRY" -u "$USER" --password-stdin || {
-        print_error "Login failed"
-        return 1
-    }
-    
-    print_step "Pulling image..."
+    print_step "Pulling image: $image..."
     docker pull "$full_image" || {
-        print_error "Pull failed"
+        print_error "Pull failed for $image"
         return 1
     }
     
     print_step "Saving to $tar_file..."
     docker save "$full_image" -o "$tar_file" || {
-        print_error "Save failed"
+        print_error "Save failed for $image"
         return 1
     }
     
-    print_success "Image saved successfully"
+    print_success "Image $image saved successfully"
     return 0
 }
 
 download_with_skopeo() {
-    local full_image="${REGISTRY}/${IMAGE}"
-    local tar_file="${OUTPUT_DIR}/$(echo $IMAGE | tr '/' '-' | tr ':' '-').tar"
+    local image=$1
+    local full_image="${REGISTRY}/${image}"
+    local tar_file="${OUTPUT_DIR}/$(echo $image | tr '/' '-' | tr ':' '-').tar"
     local cert_path=$(realpath "$CERT_FILE")
     
-    print_step "Downloading with skopeo..."
+    print_step "Downloading $image with skopeo..."
     skopeo copy \
         --src-cert-dir="$(dirname $cert_path)" \
         --src-creds="${USER}:${PASSWORD}" \
         "docker://${full_image}" \
         "docker-archive:${tar_file}:${full_image}" || {
-        print_error "Download failed"
+        print_error "Download failed for $image"
         return 1
     }
     
-    print_success "Image saved successfully"
+    print_success "Image $image saved successfully"
     return 0
 }
 
 main() {
     local PASSWORD=""
     local FORCE_TOOL=""
+    local TARGET_IMAGES=()
     
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -162,19 +178,59 @@ main() {
                 OUTPUT_DIR="$2"
                 shift 2
                 ;;
+            --harbor)
+                USE_HARBOR=true
+                REGISTRY="$HARBOR_REGISTRY"
+                shift
+                ;;
+            --local)
+                USE_HARBOR=false
+                REGISTRY="$DEFAULT_REGISTRY"
+                shift
+                ;;
             -h|--help)
                 show_help
                 ;;
-            *)
+            -*)
                 print_error "Unknown option: $1"
                 echo "Use -h or --help for usage"
                 exit 1
                 ;;
+            *)
+                # Image name argument - use appropriate map
+                if [ "$USE_HARBOR" = true ]; then
+                    if [[ -n "${IMAGE_MAP_HARBOR[$1]}" ]]; then
+                        TARGET_IMAGES+=("${IMAGE_MAP_HARBOR[$1]}")
+                    else
+                        print_error "Unknown image: $1 (use: backend, nginx-log-parser)"
+                        exit 1
+                    fi
+                else
+                    if [[ -n "${IMAGE_MAP_LOCAL[$1]}" ]]; then
+                        TARGET_IMAGES+=("${IMAGE_MAP_LOCAL[$1]}")
+                    else
+                        print_error "Unknown image: $1 (use: backend, nginx-log-parser)"
+                        exit 1
+                    fi
+                fi
+                shift
+                ;;
         esac
     done
     
+    # If no images specified, download all
+    if [ ${#TARGET_IMAGES[@]} -eq 0 ]; then
+        if [ "$USE_HARBOR" = true ]; then
+            TARGET_IMAGES=("${IMAGE_MAP_HARBOR[@]}")
+        else
+            TARGET_IMAGES=("${IMAGE_MAP_LOCAL[@]}")
+        fi
+        print_info "No images specified, downloading all images"
+    fi
+    
     echo
-    print_info "InSustain Backend Image Download"
+    print_info "InSustain Images Download"
+    print_info "Registry: $REGISTRY"
     print_info "Working directory: $(pwd)"
     echo
     
@@ -208,27 +264,49 @@ main() {
     # Create output directory
     mkdir -p "$OUTPUT_DIR"
     
-    # Download
-    print_info "Downloading: ${REGISTRY}/${IMAGE}"
-    echo
-    
+    # Configure Docker if using docker
     if [ "$tool" = "docker" ]; then
-        download_with_docker
-    else
-        download_with_skopeo
+        print_step "Configuring Docker certificate..."
+        local cert_dir="/etc/docker/certs.d/${REGISTRY}"
+        sudo mkdir -p "$cert_dir"
+        sudo cp "$CERT_FILE" "$cert_dir/ca.crt"
+        
+        if systemctl is-active --quiet docker; then
+            print_info "Restarting Docker daemon..."
+            sudo systemctl restart docker
+            sleep 2
+        fi
+        
+        print_step "Logging into registry..."
+        echo "$PASSWORD" | docker login "$REGISTRY" -u "$USER" --password-stdin || {
+            print_error "Login failed"
+            exit 1
+        }
+        echo
     fi
     
-    local result=$?
-    
-    echo
-    if [ $result -eq 0 ]; then
-        print_success "Download complete!"
+    # Download all images
+    local failed=0
+    for image in "${TARGET_IMAGES[@]}"; do
+        print_info "Downloading: ${REGISTRY}/${image}"
         echo
-        print_info "Image saved in: $OUTPUT_DIR/"
+        
+        if [ "$tool" = "docker" ]; then
+            download_with_docker "$image" || failed=1
+        else
+            download_with_skopeo "$image" || failed=1
+        fi
+        echo
+    done
+    
+    if [ $failed -eq 0 ]; then
+        print_success "All downloads complete!"
+        echo
+        print_info "Images saved in: $OUTPUT_DIR/"
         print_info "Transfer this directory to your Kubernetes node and run:"
         echo "  ./scripts/import-backend-image.sh"
     else
-        print_error "Download failed"
+        print_error "Some downloads failed"
         exit 1
     fi
 }
