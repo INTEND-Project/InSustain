@@ -15,29 +15,22 @@ NC='\033[0m'
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 cd "$GIT_ROOT"
 
-# Find git repository root
-GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
-cd "$GIT_ROOT"
-
-DEFAULT_REGISTRY="89.133.95.6:5001"
-HARBOR_REGISTRY="registry.gate-ai.eu"
-
-# Default to local registry
-USE_HARBOR=false
-REGISTRY="$DEFAULT_REGISTRY"
+REGISTRY="89.133.95.6:5001"
 USER="intend"
+ALL_IMAGES=("insustain/backend:latest" "insustain/nginx-log-parser:latest" "insustain/attribution-pipeline:latest")
 CERT_FILE="certs/docker_ca.crt"
 OUTPUT_DIR="insustain-images"
 
-# Image name mapping (will be set based on registry)
-declare -A IMAGE_MAP_LOCAL=(
+# Image name mapping (matches build.sh image names)
+declare -A IMAGE_MAP=(
     ["backend"]="insustain/backend:latest"
     ["nginx-log-parser"]="insustain/nginx-log-parser:latest"
-)
-
-declare -A IMAGE_MAP_HARBOR=(
-    ["backend"]="intend/insustain-backend:latest"
-    ["nginx-log-parser"]="intend/insustain-nginx-log-parser:latest"
+    ["attribution-pipeline"]="insustain/attribution-pipeline:latest"
+    ["frontend"]="insustain/frontend:latest"
+    ["app-simulator"]="insustain/app-simulator:latest"
+    ["sysbench"]="insustain/sysbench:latest"
+    ["flask-app"]="insustain/flask-app:latest"
+    ["locust"]="insustain/locust:latest"
 )
 
 print_info() { echo -e "${YELLOW}[INFO]${NC} $1"; }
@@ -57,30 +50,28 @@ Options:
   -p, --password PASSWORD    Registry password (or use REGISTRY_PASSWORD env var)
   -t, --tool TOOL           Force tool: docker or skopeo (auto-detect by default)
   -o, --output DIR          Output directory (default: insustain-images)
-  --harbor                  Download from Harbor registry (registry.gate-ai.eu)
-  --local                   Download from local registry (default: 89.133.95.6:5001)
   -h, --help                Show this help
 
 Image Names:
-  backend, nginx-log-parser
-  If no image specified, all images will be downloaded
+  backend, nginx-log-parser, attribution-pipeline, frontend, app-simulator,
+  sysbench, flask-app, locust
+  If no image specified, default images (backend, nginx-log-parser, attribution-pipeline) will be downloaded
 
 Examples:
-  $0 -p mypassword                    # Download all images from local registry
-  $0 -p mypassword backend            # Download backend only from local
-  $0 --harbor -p mypassword           # Download all from Harbor
-  $0 --harbor -p mypassword nginx-log-parser
-  $0 --tool skopeo -p mypassword backend nginx-log-parser
+  $0 -p mypassword                    # Download default images
+  $0 -p mypassword backend            # Download backend only
+  $0 -p mypassword attribution-pipeline  # Download attribution-pipeline only
+  $0 --tool skopeo -p mypassword backend attribution-pipeline
   REGISTRY_PASSWORD=mypassword $0
 
 Output:
   Creates directory with: 
-    - insustain-backend-latest.tar (or intend-insustain-backend-latest.tar for Harbor)
-    - insustain-nginx-log-parser-latest.tar (or intend-insustain-nginx-log-parser-latest.tar for Harbor)
+    - insustain-backend-latest.tar
+    - insustain-nginx-log-parser-latest.tar
 
 Next Steps:
   Transfer the output directory to your Kubernetes node and run:
-    ./scripts/import-backend-image.sh [--harbor]
+    ./scripts/import-backend-image.sh
 
 EOF
     exit 0
@@ -178,16 +169,6 @@ main() {
                 OUTPUT_DIR="$2"
                 shift 2
                 ;;
-            --harbor)
-                USE_HARBOR=true
-                REGISTRY="$HARBOR_REGISTRY"
-                shift
-                ;;
-            --local)
-                USE_HARBOR=false
-                REGISTRY="$DEFAULT_REGISTRY"
-                shift
-                ;;
             -h|--help)
                 show_help
                 ;;
@@ -197,21 +178,13 @@ main() {
                 exit 1
                 ;;
             *)
-                # Image name argument - use appropriate map
-                if [ "$USE_HARBOR" = true ]; then
-                    if [[ -n "${IMAGE_MAP_HARBOR[$1]}" ]]; then
-                        TARGET_IMAGES+=("${IMAGE_MAP_HARBOR[$1]}")
-                    else
-                        print_error "Unknown image: $1 (use: backend, nginx-log-parser)"
-                        exit 1
-                    fi
+                # Image name argument
+                if [[ -n "${IMAGE_MAP[$1]}" ]]; then
+                    TARGET_IMAGES+=("${IMAGE_MAP[$1]}")
                 else
-                    if [[ -n "${IMAGE_MAP_LOCAL[$1]}" ]]; then
-                        TARGET_IMAGES+=("${IMAGE_MAP_LOCAL[$1]}")
-                    else
-                        print_error "Unknown image: $1 (use: backend, nginx-log-parser)"
-                        exit 1
-                    fi
+                    print_error "Unknown image: $1"
+                    echo "Available images: ${!IMAGE_MAP[@]}"
+                    exit 1
                 fi
                 shift
                 ;;
@@ -220,17 +193,12 @@ main() {
     
     # If no images specified, download all
     if [ ${#TARGET_IMAGES[@]} -eq 0 ]; then
-        if [ "$USE_HARBOR" = true ]; then
-            TARGET_IMAGES=("${IMAGE_MAP_HARBOR[@]}")
-        else
-            TARGET_IMAGES=("${IMAGE_MAP_LOCAL[@]}")
-        fi
+        TARGET_IMAGES=("${ALL_IMAGES[@]}")
         print_info "No images specified, downloading all images"
     fi
     
     echo
     print_info "InSustain Images Download"
-    print_info "Registry: $REGISTRY"
     print_info "Working directory: $(pwd)"
     echo
     

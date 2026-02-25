@@ -16,29 +16,22 @@ NC='\033[0m'
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 cd "$GIT_ROOT"
 
-# Find git repository root
-GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
-cd "$GIT_ROOT"
-
-DEFAULT_REGISTRY="89.133.95.6:5001"
-HARBOR_REGISTRY="registry.gate-ai.eu"
-
-# Default to local registry
-USE_HARBOR=false
-REGISTRY="$DEFAULT_REGISTRY"
+REGISTRY="89.133.95.6:5001"
 USER="intend"
+ALL_IMAGES=("insustain/backend:latest" "insustain/nginx-log-parser:latest" "insustain/attribution-pipeline:latest")
 CERT_FILE="certs/docker_ca.crt"
 IMAGE_DIR="insustain-images"
 
-# Image name mapping (will be set based on registry)
-declare -A IMAGE_MAP_LOCAL=(
+# Image name mapping (matches build.sh image names)
+declare -A IMAGE_MAP=(
     ["backend"]="insustain/backend:latest"
     ["nginx-log-parser"]="insustain/nginx-log-parser:latest"
-)
-
-declare -A IMAGE_MAP_HARBOR=(
-    ["backend"]="intend/insustain-backend:latest"
-    ["nginx-log-parser"]="intend/insustain-nginx-log-parser:latest"
+    ["attribution-pipeline"]="insustain/attribution-pipeline:latest"
+    ["frontend"]="insustain/frontend:latest"
+    ["app-simulator"]="insustain/app-simulator:latest"
+    ["sysbench"]="insustain/sysbench:latest"
+    ["flask-app"]="insustain/flask-app:latest"
+    ["locust"]="insustain/locust:latest"
 )
 
 print_info() { echo -e "${YELLOW}[INFO]${NC} $1"; }
@@ -59,13 +52,12 @@ Options:
   -m, --method METHOD       Import method: tar or pull (default: auto-detect)
   -p, --password PASSWORD   Registry password (required for pull method)
   -d, --dir DIR            Image directory (default: insustain-images)
-  --harbor                 Use Harbor registry (registry.gate-ai.eu)
-  --local                  Use local registry (default: 89.133.95.6:5001)
   -h, --help               Show this help
 
 Image Names:
-  backend, nginx-log-parser
-  If no image specified, all images will be imported
+  backend, nginx-log-parser, attribution-pipeline, frontend, app-simulator,
+  sysbench, flask-app, locust
+  If no image specified, default images (backend, nginx-log-parser, attribution-pipeline) will be imported
 
 Methods:
   tar   - Import from tar file (offline, no registry access needed)
@@ -82,8 +74,11 @@ Examples:
   # Import nginx-log-parser only
   $0 nginx-log-parser
 
-  # Force pull from Harbor registry
-  $0 --harbor --method pull -p mypassword
+  # Import attribution-pipeline only
+  $0 attribution-pipeline
+
+  # Force pull from registry
+  $0 --method pull -p mypassword
 
   # Import from custom directory
   $0 --dir /path/to/images
@@ -231,16 +226,6 @@ main() {
                 IMAGE_DIR="$2"
                 shift 2
                 ;;
-            --harbor)
-                USE_HARBOR=true
-                REGISTRY="$HARBOR_REGISTRY"
-                shift
-                ;;
-            --local)
-                USE_HARBOR=false
-                REGISTRY="$DEFAULT_REGISTRY"
-                shift
-                ;;
             -h|--help)
                 show_help
                 ;;
@@ -250,21 +235,13 @@ main() {
                 exit 1
                 ;;
             *)
-                # Image name argument - use appropriate map
-                if [ "$USE_HARBOR" = true ]; then
-                    if [[ -n "${IMAGE_MAP_HARBOR[$1]}" ]]; then
-                        TARGET_IMAGES+=("${IMAGE_MAP_HARBOR[$1]}")
-                    else
-                        print_error "Unknown image: $1 (use: backend, nginx-log-parser)"
-                        exit 1
-                    fi
+                # Image name argument
+                if [[ -n "${IMAGE_MAP[$1]}" ]]; then
+                    TARGET_IMAGES+=("${IMAGE_MAP[$1]}")
                 else
-                    if [[ -n "${IMAGE_MAP_LOCAL[$1]}" ]]; then
-                        TARGET_IMAGES+=("${IMAGE_MAP_LOCAL[$1]}")
-                    else
-                        print_error "Unknown image: $1 (use: backend, nginx-log-parser)"
-                        exit 1
-                    fi
+                    print_error "Unknown image: $1"
+                    echo "Available images: ${!IMAGE_MAP[@]}"
+                    exit 1
                 fi
                 shift
                 ;;
@@ -273,17 +250,12 @@ main() {
     
     # If no images specified, import all
     if [ ${#TARGET_IMAGES[@]} -eq 0 ]; then
-        if [ "$USE_HARBOR" = true ]; then
-            TARGET_IMAGES=("${IMAGE_MAP_HARBOR[@]}")
-        else
-            TARGET_IMAGES=("${IMAGE_MAP_LOCAL[@]}")
-        fi
+        TARGET_IMAGES=("${ALL_IMAGES[@]}")
         print_info "No images specified, importing all images"
     fi
     
     echo
     print_info "InSustain Images Import"
-    print_info "Registry: $REGISTRY"
     print_info "Working directory: $(pwd)"
     echo
     
