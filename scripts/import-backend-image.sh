@@ -18,20 +18,20 @@ cd "$GIT_ROOT"
 
 REGISTRY="89.133.95.6:5001"
 USER="intend"
-ALL_IMAGES=("insustain/backend:latest" "insustain/nginx-log-parser:latest" "insustain/attribution-pipeline:latest")
+ALL_IMAGES=("intend/insustain-backend:latest" "intend/insustain-nginx-log-parser:latest" "intend/insustain-attribution-pipeline:latest")
 CERT_FILE="certs/docker_ca.crt"
 IMAGE_DIR="insustain-images"
 
 # Image name mapping (matches build.sh image names)
 declare -A IMAGE_MAP=(
-    ["backend"]="insustain/backend:latest"
-    ["nginx-log-parser"]="insustain/nginx-log-parser:latest"
-    ["attribution-pipeline"]="insustain/attribution-pipeline:latest"
-    ["frontend"]="insustain/frontend:latest"
-    ["app-simulator"]="insustain/app-simulator:latest"
-    ["sysbench"]="insustain/sysbench:latest"
-    ["flask-app"]="insustain/flask-app:latest"
-    ["locust"]="insustain/locust:latest"
+    ["backend"]="intend/insustain-backend:latest"
+    ["nginx-log-parser"]="intend/insustain-nginx-log-parser:latest"
+    ["attribution-pipeline"]="intend/insustain-attribution-pipeline:latest"
+    ["frontend"]="intend/insustain-frontend:latest"
+    ["app-simulator"]="intend/insustain-app-simulator:latest"
+    ["sysbench"]="intend/insustain-sysbench:latest"
+    ["flask-app"]="intend/insustain-flask-app:latest"
+    ["locust"]="intend/insustain-locust:latest"
 )
 
 print_info() { echo -e "${YELLOW}[INFO]${NC} $1"; }
