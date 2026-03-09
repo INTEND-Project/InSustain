@@ -1,17 +1,26 @@
+# Default values for inSustain
+# These are production-safe defaults. Credentials use placeholders that MUST
+# be overridden at install time via --set flags or environment-specific values files.
+#
+# Usage:
+#   helm install insustain ./insustain \
+#     --set global.minio.rootPassword=YOUR_PASSWORD \
+#     --set global.postgresql.password=YOUR_PASSWORD
+
 global:
   image:
     repository: 89.133.95.6:5001
-  
+
   minio:
-    rootUser: &rootUser "rootUser"
-    rootPassword: &rootPass "rootpass123"
+    rootUser: &rootUser ""
+    rootPassword: &rootPass ""
 
   s3:
     endpoint: &s3Endpoint http://minio.insustain.svc.cluster.local:9000
-  
+
   postgresql:
-    user: &postgresUser "user"
-    password: &postgresPassword "password"
+    user: &postgresUser ""
+    password: &postgresPassword ""
     database: &postgresDatabase "appdb"
     
   srs:
@@ -164,7 +173,7 @@ mysql:
     persistence:
       enabled: false
   auth:
-    rootPassword: benchmark
+    rootPassword: ""
     database: benchdb
 
 sysbench:
@@ -180,7 +189,7 @@ sysbench:
 
   mysql:
     auth:
-      rootPassword: benchmark
+      rootPassword: ""
       database: benchdb
   workload: oltp_read_write
 

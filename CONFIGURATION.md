@@ -56,17 +56,17 @@ global:
 
 ### Shared Credentials
 
-Credentials shared across components:
+Credentials shared across components. These must be set at install time:
 
 ```yaml
 global:
   minio:
-    rootUser: "rootUser"
-    rootPassword: "rootpass123"
-  
+    rootUser: "<your-minio-user>"
+    rootPassword: "<your-minio-password>"
+
   postgresql:
-    user: "user"
-    password: "password"
+    user: "<your-postgres-user>"
+    password: "<your-postgres-password>"
     database: "appdb"
 ```
 
@@ -314,8 +314,8 @@ mongodb:
 postgres:
   enabled: true
   
-  postgresUser: "user"
-  postgresPassword: "password"
+  postgresUser: "<your-postgres-user>"
+  postgresPassword: "<your-postgres-password>"
   postgresDb: "appdb"
   
   persistence:
@@ -342,15 +342,15 @@ mlflow:
       host: "postgres"
       port: 5432
       database: "appdb"
-      user: "user"
-      password: "password"
-  
+      user: "<your-postgres-user>"
+      password: "<your-postgres-password>"
+
   artifactRoot:
     s3:
       enabled: true
       bucket: "mlflow"
-      awsAccessKeyId: "rootUser"
-      awsSecretAccessKey: "rootpass123"
+      awsAccessKeyId: "<your-minio-user>"
+      awsSecretAccessKey: "<your-minio-password>"
   
   extraEnvVars:
     MLFLOW_S3_ENDPOINT_URL: "http://minio.insustain.svc.cluster.local:9000"
@@ -378,8 +378,8 @@ minio:
   replicas: 1
   mode: standalone
   
-  rootUser: "rootUser"
-  rootPassword: "rootpass123"
+  rootUser: "<your-minio-user>"
+  rootPassword: "<your-minio-password>"
   
   persistence:
     enabled: false  # Set to true for production
