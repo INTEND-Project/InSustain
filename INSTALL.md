@@ -1,313 +1,98 @@
-# Installation Guide
-
-Complete installation instructions for InSustain.
+# Installing InSustain
 
 ## Prerequisites
 
-- Kubernetes v1.30.6+
-- Helm v3.17.1+
-- kubectl configured with cluster access
-- Docker registry credentials (from INTEND team)
+- A Kubernetes cluster and Helm 3.
+- A default StorageClass. MongoDB, PostgreSQL and MinIO each claim a volume.
+- A registry token with `read:packages` for the private InSustain images,
+  issued by the INTEND project.
+- Prometheus Operator CRDs, unless you turn monitoring off (see below). The
+  backend reads metrics from Prometheus at
+  `prometheus-operated.monitoring.svc.cluster.local:9090`. Set
+  `backend.prometheus.namespace` and `backend.prometheus.serviceName` to
+  point at yours.
 
-## Installation Methods
+The backend's ClusterRole can read pods, services and endpoints in every
+namespace. It uses this to discover workloads.
 
-**Method 1: Automated Script** (Recommended) - Quick setup with scripts  
-**Method 2: Manual Installation** - Step-by-step for custom needs
-
----
-
-## Method 1: Automated Installation (Recommended)
-
-### Choose Your Script
-
-**Option A: Kubernetes Native** (Recommended)
-```bash
-./scripts/scripts/setup-insustain-k8s-native.sh -p <password>
-```
-
-**Option B: K3s Direct Import**
-```bash
-sudo ./scripts/scripts/setup-insustain.sh
-```
-
-### Script Options
+## 1. Download the chart
 
 ```bash
--p, --password PASSWORD    # Docker registry password
--y, --yes                  # Auto-answer yes to prompts
---enable-full-rbac         # Enable multi-namespace monitoring
--h, --help                 # Show help
+gh release download v2.0.<n> --repo INTEND-Project/InSustain --pattern 'insustain-*.tgz'
+helm show values insustain-2.0.<n>.tgz | grep digest
 ```
 
-### What the Scripts Do
+The two `digest` values are the exact images this release runs.
 
-1. Install Prometheus (if not present)
-2. Install Kepler (if not present)
-3. Configure registry access
-4. Deploy InSustain components
-5. Display access information
+## 2. Create the Secrets
 
----
+The chart creates no credentials. Before you install, create these four
+Secrets in the release namespace, with these exact names and keys:
 
-## Method 2: Manual Installation
-
-### Step 1: Install Prometheus
+| Secret | Keys | Used by |
+|--------|------|---------|
+| `insustain-ghcr-pull` | type `kubernetes.io/dockerconfigjson` | image pulls for backend and frontend |
+| `insustain-object-store` | `rootUser`, `rootPassword` | MinIO, backend, MLflow artifact store |
+| `insustain-postgres` | `username`, `password` | PostgreSQL, MLflow backend store |
+| `insustain-mongodb` | `username`, `password` | MongoDB, backend |
 
 ```bash
-helm install prometheus oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack \
-    --version 81.4.3 \
-    --namespace monitoring \
-    --create-namespace \
-    --wait
+NS=insustain
+kubectl create namespace "$NS"
+kubectl -n "$NS" create secret docker-registry insustain-ghcr-pull \
+  --docker-server=ghcr.io --docker-username=<github-user> --docker-password=<token>
+kubectl -n "$NS" create secret generic insustain-object-store \
+  --from-literal=rootUser=<user> --from-literal=rootPassword=<password>
+kubectl -n "$NS" create secret generic insustain-postgres \
+  --from-literal=username=<user> --from-literal=password=<password>
+kubectl -n "$NS" create secret generic insustain-mongodb \
+  --from-literal=username=<user> --from-literal=password=<password>
 ```
 
-### Step 2: Install Kepler
+Choose your own values. Use a MinIO `rootPassword` of at least 8 characters.
 
-**Option A: Via InSustain** (Recommended)
-```bash
-# Skip this step, enable in InSustain install
-helm install insustain insustain/ --set kepler.enabled=true
-```
-
-**Option B: Separately**
-```bash
-helm repo add kepler https://sustainable-computing-io.github.io/kepler-helm-chart
-helm install kepler kepler/kepler \
-    --version 0.8.0 \
-    --set serviceMonitor.enabled=true \
-    --set serviceMonitor.labels.release=monitoring \
-    --namespace monitoring \
-    --wait
-```
-
-### Step 3: Get InSustain
-
-**Download:**
-```bash
-curl -L "https://github.com/INTEND-Project/InSustain/archive/refs/tags/v1.2.0.tar.gz" -o insustain.tar.gz
-tar -xzf insustain.tar.gz
-cd InSustain-1.2.0
-```
-
-**Or Clone:**
-```bash
-git clone --branch v1.2.0 --depth 1 https://github.com/INTEND-Project/InSustain.git
-cd InSustain
-```
-
-### Step 4: Install Helm Chart
-
-**Basic:**
-```bash
-helm install insustain insustain/ --namespace insustain --create-namespace
-```
-
-**With Multi-Namespace Monitoring:**
-```bash
-helm install insustain insustain/ \
-  --namespace insustain \
-  --create-namespace \
-  --set backend.rbac.create=true \
-  --set backend.serviceAccount.create=true
-```
-
-**With Persistent Storage:**
-```bash
-helm install insustain insustain/ \
-  --namespace insustain \
-  --create-namespace \
-  --set mongodb.persistence.enabled=true \
-  --set postgres.persistence.enabled=true \
-  --set minio.persistence.enabled=true
-```
-
-### Step 5: Verify
+## 3. Install
 
 ```bash
-kubectl -n insustain get pods
-kubectl -n insustain get svc
+helm install insustain insustain-2.0.<n>.tgz -n "$NS"
 ```
 
-### Step 6: Access API
+Useful options:
+
+| Option | Effect |
+|--------|--------|
+| `--set frontend.enabled=false` | Install without the dashboard |
+| `--set backend.serviceMonitor.enabled=false --set minio.metrics.serviceMonitor.enabled=false` | No Prometheus Operator objects. Use this if the CRDs are absent. |
+| `--set backend.trainingScheduler.enabled=true` | Train models in the background |
+
+## 4. Create the MLflow artifact bucket
+
+The chart does not create MinIO buckets or users. MLflow stores artifacts in
+the bucket `mlflow`, and training and prediction fail until it exists. Create
+it once with the object-store credentials:
 
 ```bash
-kubectl -n insustain port-forward svc/insustain-backend 8089:8089
-# Open: http://localhost:8089/docs
+kubectl -n "$NS" port-forward svc/insustain-minio 9000:9000 &
+mc alias set insustain http://localhost:9000 <user> <password>
+mc mb insustain/mlflow
 ```
 
----
+To use another name, set `mlflow.artifactRoot.s3.bucket`.
 
-## Configuration Options
-
-### Multi-Namespace Monitoring
-
-Enable backend to discover pods across all namespaces:
-```bash
---set backend.rbac.create=true \
---set backend.serviceAccount.create=true
-```
-
-See [RBAC.md](RBAC.md) for details.
-
-### Custom Prometheus
+## 5. Check
 
 ```bash
---set prometheus.namespace=<namespace> \
---set prometheus.serviceName=<service-name>
+kubectl -n "$NS" get pods
+kubectl -n "$NS" port-forward svc/insustain-backend 8089:8089 &
+curl http://localhost:8089/health
 ```
 
-### Custom Registry
+## Upgrade and uninstall
 
 ```bash
---set global.image.repository=<registry-url>
+helm upgrade insustain insustain-2.0.<m>.tgz -n "$NS"
+helm uninstall insustain -n "$NS"
 ```
 
-### Persistent Storage
-
-```bash
---set mongodb.persistence.enabled=true \
---set mongodb.persistence.storageClass=<class> \
---set postgres.persistence.enabled=true \
---set minio.persistence.enabled=true
-```
-
----
-
----
-
-## Manual Image Import (Optional)
-
-For pre-loading images before Helm deployment.
-
-### Scenario 1: Same Machine (Docker + Kubernetes)
-
-```bash
-./scripts/scripts/import-images.sh <password>
-```
-
-### Scenario 2: Same Machine (No Docker)
-
-Use skopeo instead:
-```bash
-# Install skopeo
-sudo apt install skopeo
-
-# Download and import
-./scripts/scripts/import-images.sh --use-skopeo <password>
-```
-
-### Scenario 3: Separate Machines
-
-**On machine with Docker:**
-```bash
-./scripts/scripts/download-images.sh <password>
-```
-
-**Transfer `insustain-images/` directory to Kubernetes node**
-
-**On Kubernetes node:**
-```bash
-./scripts/scripts/load-images.sh
-```
-
-### Deploy
-
-After importing images:
-```bash
-helm install insustain insustain/ --set backend.image.pullPolicy=IfNotPresent
-```
-
----
-
----
-
-## Troubleshooting
-
-**Test registry access first:**
-```bash
-./scripts/scripts/test-registry-access.sh <password>
-```
-
-This diagnostic script checks:
-- Network connectivity to registry
-- Certificate configuration
-- Authentication
-- Runtime detection and configuration
-
-**Pods not starting:**
-```bash
-kubectl -n insustain describe pod <pod-name>
-kubectl -n insustain logs <pod-name>
-```
-
-**Image pull errors:**
-- Verify credentials with INTEND team
-- Check certificate is installed correctly for your runtime
-- Ensure registry is accessible: `ping 89.133.95.6`
-- Test manual pull with your runtime's CLI
-
-**Certificate/TLS errors when pulling images:**
-
-For K3s:
-```bash
-# Check registries config
-cat /etc/rancher/k3s/registries.yaml
-
-# Verify certificate path is correct
-ls -la $(pwd)/certs/docker_ca.crt
-
-# Restart K3s after config changes
-sudo systemctl restart k3s
-```
-
-For containerd:
-```bash
-# Check certificate directory
-ls -la /etc/containerd/certs.d/89.133.95.6:5001/
-
-# Verify certificate is readable
-sudo cat /etc/containerd/certs.d/89.133.95.6:5001/ca.crt
-
-# Restart containerd
-sudo systemctl restart containerd
-```
-
-For CRI-O:
-```bash
-# Check registries config
-cat /etc/containers/registries.conf
-
-# Verify certificate path
-cat $(pwd)/certs/docker_ca.crt
-
-# Restart CRI-O
-sudo systemctl restart crio
-```
-
-**Authentication errors:**
-- Double-check username is "intend"
-- Verify password with INTEND team
-- Ensure no extra spaces in credentials
-- Try escaping special characters in password
-
-**No metrics:**
-- Wait 5-10 minutes for data collection
-- Check Kepler: `kubectl -n monitoring get pods -l app.kubernetes.io/name=kepler`
-- Check Prometheus: `kubectl -n monitoring get svc`
-
----
-
-## Uninstallation
-
-```bash
-helm uninstall insustain -n insustain
-kubectl delete namespace insustain
-```
-
----
-
-## Next Steps
-
-- [API Guide](API_GUIDE.md) - API reference
-- [Configuration](CONFIGURATION.md) - Advanced options
-- [RBAC](RBAC.md) - Security and permissions
+Uninstalling keeps the Secrets. The volume claims may also remain, depending
+on your StorageClass. Delete them yourself if you want the data gone.

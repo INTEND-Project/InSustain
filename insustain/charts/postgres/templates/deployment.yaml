@@ -14,6 +14,14 @@ spec:
       labels:
         app: {{ include "postgresql.name" . }}
     spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: postgres
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -22,10 +30,23 @@ spec:
             - containerPort: 5432
               name: postgres
           env:
+            {{- if .Values.existingSecret }}
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: password
+            {{- else }}
             - name: POSTGRES_USER
               value: {{ if and .Values.global .Values.global.postgresql }}{{ .Values.global.postgresql.user | quote }}{{ else }}{{ .Values.postgresUser | quote }}{{ end }}
             - name: POSTGRES_PASSWORD
-              value: {{ if and .Values.global .Values.global.postgresql }}{{ .Values.global.postgresql.password | quote }}{{ else }}{{ .Values.postgresPassword | quote }}{{ end }}
+              value: {{ if and .Values.global .Values.global.postgresql }}{{ required "global.postgresql.password is required unless postgres.existingSecret names a Secret with keys username and password" .Values.global.postgresql.password | quote }}{{ else }}{{ required "postgres.postgresPassword is required unless postgres.existingSecret names a Secret with keys username and password" .Values.postgresPassword | quote }}{{ end }}
+            {{- end }}
             - name: POSTGRES_DB
               value: {{ if and .Values.global .Values.global.postgresql }}{{ .Values.global.postgresql.database | quote }}{{ else }}{{ .Values.postgresDb | quote }}{{ end }}
           volumeMounts:

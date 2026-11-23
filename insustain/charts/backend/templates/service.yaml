@@ -6,17 +6,27 @@ metadata:
     {{- include "backend.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
+  # nodePort is only emitted when set, so a ClusterIP override stays valid.
   ports:
     - port: {{ .Values.service.backend.port }}
       targetPort: backend
       protocol: TCP
       name: backend
+      {{- with .Values.service.backend.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
     - port: {{ .Values.service.jupyter.port }}
       targetPort: jupyter
       protocol: TCP
       name: jupyter
+      {{- with .Values.service.jupyter.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
     - port: {{ .Values.service.pm.port }}
       protocol: TCP
       name: pm
+      {{- with .Values.service.pm.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
   selector:
     {{- include "backend.selectorLabels" . | nindent 4 }}

@@ -7,13 +7,27 @@ image:
 
 auth:
   rootUsername: admin
-  rootPassword: secret
+  rootPassword: ""
   database: monitoring
+  # Name of an existing Secret with keys username and password. When set, the
+  # chart creates no Secret and rootUsername/rootPassword are ignored.
+  existingSecret: ""
+
+# Pod-level securityContext (e.g. fsGroup to match a pre-provisioned PV's
+# directory ownership). Empty by default; set per-environment in values-*.yaml.
+podSecurityContext: {}
+
+# Pin the pod to a node. Empty by default (scheduler decides); set per-UC in the
+# umbrella's values-*.yaml. Matters whenever persistence uses a node-local PV
+# (hostPath), since the data only exists on one node.
+nodeSelector: {}
 
 persistence:
   enabled: false
   size: 5Gi
-  storageClassName: "mongo-pvc"
+  # existingClaim: bind to a pre-provisioned PVC instead of creating one.
+  # storageClassName applies only when creating a PVC (existingClaim unset).
+  storageClassName: ""
 
 service:
   type: ClusterIP

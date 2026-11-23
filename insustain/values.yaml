@@ -1,50 +1,37 @@
-# Default values for inSustain
-# These are production-safe defaults. Credentials use placeholders that MUST
-# be overridden at install time via --set flags or environment-specific values files.
+# Default values for the inSustain partner chart (generated).
 #
-# Usage:
-#   helm install insustain ./insustain \
-#     --set global.minio.rootPassword=YOUR_PASSWORD \
-#     --set global.postgresql.password=YOUR_PASSWORD
-
+# Images are pinned by digest on ghcr.io/intend-project. Create these Secrets in the
+# release namespace before installing:
+#   insustain-ghcr-pull       image pull secret for ghcr.io/intend-project
+#   insustain-object-store    keys rootUser, rootPassword (object store)
+#   insustain-postgres        keys username, password (PostgreSQL)
+#   insustain-mongodb         keys username, password (MongoDB)
 global:
   image:
-    repository: 89.133.95.6:5001
-
-  minio:
-    rootUser: &rootUser ""
-    rootPassword: &rootPass ""
-
+    repository: ghcr.io/intend-project
+    prefix: insustain-
+  minio: {}
   s3:
-    endpoint: &s3Endpoint http://minio.insustain.svc.cluster.local:9000
-
+    endpoint: http://minio.insustain.svc.cluster.local:9000
   postgresql:
-    user: &postgresUser ""
-    password: &postgresPassword ""
-    database: &postgresDatabase "appdb"
-    
-  srs:
-    http: 8080
-    rtmp: 1935
-    nodePort:
-      rtmp: 30001
-      http: 30002
-  locust:
-    port: 8099
+    database: appdb
   monitoring:
     labels:
       release: monitoring
-
 backend:
   enabled: true
   rbac:
-    create: false
+    create: true
   serviceAccount:
-  # Specifies whether a service account should be created
-    create: false
+    create: true
   mongo:
     db: monitoring
+    existingSecret: insustain-mongodb
+  trainingScheduler:
+    enabled: false
+  extraEnv: []
   service:
+    type: ClusterIP
     backend:
       port: 8089
     jupyter:
@@ -52,210 +39,97 @@ backend:
     pm:
       port: 8887
   image:
-    tag: latest
-    pullPolicy: Always
+    digest: sha256:4d140bfb2f1b1bf6bbfeda6cda250795f695955c21b2ec08dc6ecc492687335d
+    pullPolicy: IfNotPresent
   serviceMonitor:
     enabled: true
-    portName: pm  # Name of the port defined in your service
-
+    portName: pm
+  imagePullSecrets:
+  - name: insustain-ghcr-pull
+  objectStore:
+    existingSecret: insustain-object-store
 frontend:
-  enabled: false
+  enabled: true
   image:
-    repository: localhost:5000/insustain/frontend
-    tag: latest
-    pullPolicy: Always
+    digest: sha256:63b6a421dde508c537166479024b498c1d277203a598e17643c040cfb6edbf63
+    pullPolicy: IfNotPresent
   backend:
-    jupyter:
-      port: 8888
     backend:
       port: 8089
-  configmap:
-    enabled: true
-    name: frontend-configmap
-
+  service:
+    type: ClusterIP
+    port: 3000
+  imagePullSecrets:
+  - name: insustain-ghcr-pull
 kepler:
   enabled: false
   serviceMonitor:
     enabled: true
     labels:
       release: monitoring
-
 mongodb:
   image:
     repository: docker.io
     prefix: mongo
-    tag: "8.0"
+    tag: '8.0'
   enabled: true
   service:
     type: ClusterIP
     port: 27017
   persistence:
-    enabled: false
-
+    enabled: true
+  auth:
+    existingSecret: insustain-mongodb
 postgres:
   enabled: true
-  postgresUser: *postgresUser
-  postgresPassword: *postgresPassword
-  postgresDb: *postgresDatabase
+  postgresDb: appdb
   persistence:
-    enabled: false
-
+    enabled: true
+  existingSecret: insustain-postgres
 mlflow:
   image:
     tag: 3.5.1
-  
   log:
     enabled: true
-    level: debug 
-
+    level: info
   backendStore:
     databaseConnectionCheck: true
     postgres:
       enabled: true
-      host: "postgres"            # your PostgreSQL service name
+      host: postgres
       port: 5432
-      database: *postgresDatabase
-      user: *postgresUser
-      password: *postgresPassword
-
+      database: appdb
+    existingDatabaseSecret:
+      name: insustain-postgres
+      usernameKey: username
+      passwordKey: password
   artifactRoot:
     s3:
       enabled: true
-      bucket: "mlflow"
-      awsAccessKeyId: *rootUser
-      awsSecretAccessKey: *rootPass
-
+      bucket: mlflow
+      existingSecret:
+        name: insustain-object-store
+        keyOfAccessKeyId: rootUser
+        keyOfSecretAccessKey: rootPassword
   extraEnvVars:
-    MLFLOW_S3_ENDPOINT_URL: *s3Endpoint
-    MLFLOW_S3_IGNORE_TLS: "true"
-    MLFLOW_SERVER_ALLOWED_HOSTS: "*"
-
+    MLFLOW_S3_ENDPOINT_URL: http://minio.insustain.svc.cluster.local:9000
+    MLFLOW_S3_IGNORE_TLS: 'true'
+    MLFLOW_SERVER_ALLOWED_HOSTS: '*'
   service:
     type: ClusterIP
     port: 5000
-
   auth:
     enabled: false
-  
-  # Disable embedded database charts - using external postgres and minio
   postgresql:
     enabled: false
     primary:
       persistence:
         enabled: false
-  
   mysql:
     enabled: false
     primary:
       persistence:
         enabled: false
-
-app-simulator:
-  enabled: false
-  image:
-    repository: localhost:5000/insustain/app-simulator
-    tag: latest
-    pullPolicy: Always
-  service:
-    prom:
-      port: 8008
-    app:
-      port: 8007
-  serviceMonitor:
-    enabled: true
-    portName: prom  # Name of the port defined in your service
-    enabled: true
-
-mysql:
-  enabled: false
-  architecrure: standalone
-  primary:
-    persistence:
-      enabled: false
-  auth:
-    rootPassword: ""
-    database: benchdb
-
-sysbench:
-  enabled: false
-  image:
-    repository: localhost:5000/insustain/sysbench
-    tag: latest
-    pullPolicy: Always
-  service:
-    port: 8080
-  serviceMonitor:
-    enabled: true
-
-  mysql:
-    auth:
-      rootPassword: ""
-      database: benchdb
-  workload: oltp_read_write
-
-srs-server:
-  enabled: false
-  image:
-  repository: ossrs/srs
-  tag: "6"
-  pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  # The configuration for SRS can be overridden by environment variables.
-  # See https://github.com/ossrs/srs/blob/develop/trunk/conf/full.conf
-  conf:
-    SRS_LOG_TANK: "console"
-    SRS_LOG_LEVEL: "trace"
-    SRS_HTTP_SERVER_ENABLED: "on"
-    SRS_HTTP_API_ENABLED: "on"
-    SRS_VHOST_HTTP_REMUX_ENABLED: "on"
-    SRS_VHOST_HLS_ENABLED: "on"
-    SRS_SRT_SERVER_ENABLED: "on"
-    SRS_VHOST_SRT_ENABLED: "on"
-    SRS_VHOST_SRT_TO_RTMP: "on"
-    SRS_RTC_SERVER_ENABLED: "on"
-    SRS_RTC_SERVER_CANDIDATE: "*"
-    SRS_VHOST_RTC_ENABLED: "on"
-    SRS_VHOST_RTC_RTMP_TO_RTC: "on"
-    SRS_VHOST_RTC_RTC_TO_RTMP: "on"
-    SRS_EXPORTER_ENABLED: "on"
-  service:
-    type: LoadBalancer
-    api: 1985
-    srt: 10080
-    rtc: 8000
-    pm: 9972
-  serviceMonitor:
-    enabled: true
-    portName: pm  # Name of the port defined in your service
-
-flask-streamer:
-  enabled: false
-  image:
-    # This sets the pull policy for images.
-    pullPolicy: Always
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: latest
-  service:
-    # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
-    type: NodePort
-    # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
-    port: 5050
-    nodePort: 30051
-  volumeMounts:
-    - name: videos
-      mountPath: /app/videos
-  volumes:
-    - name: videos
-      hostPath:
-        path: /opt/videos
-        type: Directory
-  serviceMonitor:
-    enabled: true
-    portName: main  # Name of the port defined in your service
-    enabled: true
-
 minio:
   enabled: true
   resources:
@@ -263,37 +137,13 @@ minio:
       memory: 1024Mi
   replicas: 1
   mode: standalone
-  rootUser: *rootUser
-  rootPassword: *rootPass
   persistence:
-    enabled: false
-
-locust:
-  enabled: false
-  image:
-    repository: localhost:5000/insustain/locust
-    # This sets the pull policy for images.
-    pullPolicy: Always #IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: latest # it uses locustio/locust:2.39.
-  service:
-    # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
-    type: NodePort #it was ClusterIP
-    # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
-    nodePort: 31098
-    metricsPort: 9646
-
-loadgen:
-  enabled: false
-  image:
-    repository: localhost:5000/insustain/loadgen
-    # This sets the pull policy for images.
-    pullPolicy: Always #IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: latest # it uses locustio/locust:2.39.
-  service:
-    # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
-    type: NodePort #it was ClusterIP
-    # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
-    nodePort: 31088
-    port: 8800
+    enabled: true
+  metrics:
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+      namespace: ''
+  existingSecret: insustain-object-store
+  users: []

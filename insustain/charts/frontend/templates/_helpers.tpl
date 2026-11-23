@@ -61,9 +61,27 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{/*
+Validate an optional immutable image digest. Empty means "use the tag form";
+anything else must be exactly sha256:<64 lowercase hex> (no whitespace or
+newlines), otherwise the render fails rather than emit an unpinned image.
+*/}}
+{{- define "frontend.imageDigest" -}}
+{{- $digest := .Values.image.digest | default "" -}}
+{{- if and $digest (not (regexMatch "\\Asha256:[0-9a-f]{64}\\z" $digest)) -}}
+{{- fail (printf "frontend.image.digest must be sha256:<64 lowercase hex>, got %q" $digest) -}}
+{{- end -}}
+{{- $digest -}}
+{{- end -}}
+
 {{- define "frontend.fullImage" -}}
 {{- $repo := .Values.global.image.repository | default "localhost:5000" -}}
-{{- $prefix := .Values.global.image.prefix | default "insustain"}}
-{{- $tag := .Values.image.tag | default $.Chart.AppVersion -}}
-{{- printf "%s/%s/frontend:%s" $repo $prefix $tag -}}
+{{- $prefix := .Values.global.image.prefix | default "intend/insustain-"}}
+{{- $tag := (.Values.global.image.tag | default .Values.image.tag | default $.Chart.AppVersion) -}}
+{{- $digest := include "frontend.imageDigest" . -}}
+{{- if $digest -}}
+{{- printf "%s/%sfrontend@%s" $repo $prefix $digest -}}
+{{- else -}}
+{{- printf "%s/%sfrontend:%s" $repo $prefix $tag -}}
+{{- end -}}
 {{- end -}}

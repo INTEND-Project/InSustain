@@ -19,6 +19,20 @@ image:
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
+  # Immutable image digest (sha256:<64 lowercase hex>). When set, the image is
+  # referenced as <repository>/<prefix>backend@<digest> and the tag is ignored.
+  digest: ""
+
+# Object store (MinIO/S3) credentials. Empty = literal global.minio.rootUser /
+# global.minio.rootPassword values. Set to the name of an existing Secret with
+# keys rootUser and rootPassword to read them from that Secret instead.
+objectStore:
+  existingSecret: ""
+
+# MongoDB credentials Secret (keys username, password). Empty = the Secret the
+# mongodb subchart creates, <release>-mongodb-secret.
+mongo:
+  existingSecret: ""
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
@@ -56,12 +70,57 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
+# GraphDB holding the intent digital twin. When a GraphDB
+# is reachable, energy measurements are published there as met:Observation Turtle
+# on every report; otherwise the Turtle is still generated and returned by the API
+# but not pushed.
+#
+# Leave url empty to use the in-cluster graphdb subchart (the umbrella sets
+# global.graphdb.inCluster and the deployment derives the Service address).
+# Set url only to target an EXTERNAL GraphDB -- it is resolved from inside the
+# pod, so it must not be a laptop-local address.
+graphdb:
+  url: ""
+  repository: intents_and_intent_reports
+  # Named graph to publish observations into (Graph Store Protocol). Empty =
+  # repository default graph (legacy). Set it to the graph the intent lives in
+  # so reports join it.
+  graph: ""
+
+# Background model training (ENABLE_TRAINING_SCHEDULER). Off by default. When
+# on, the backend starts the periodic retraining job and, unless
+# TELENOR_TRIGGER_ENABLED=false is set through extraEnv, the Telenor automatic
+# collect + train tick. With it off, models are only trained through the API.
+trainingScheduler:
+  enabled: false
+
+# Extra environment variables for the backend container, in Kubernetes env
+# format. Use it for settings the chart does not expose as values, e.g.
+# TELENOR_TRIGGER_* or LOG_LEVEL. Do not repeat a variable the chart already
+# sets (MONGO_*, MLFLOW_*, PROMETHEUS_URL, GRAPHDB_*, NAMESPACE_NAME,
+# ENABLE_TRAINING_SCHEDULER): duplicate names make the effective value unclear.
+#   extraEnv:
+#     - name: LOG_LEVEL
+#       value: debug
+#     - name: TELENOR_TRIGGER_PERIOD_HOURS
+#       value: "6"
+extraEnv: []
+
 # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
+# The umbrella chart overrides this block (see insustain/values.yaml). Each
+# nodePort is optional: leave it unset (or switch type to ClusterIP) and no
+# nodePort field is rendered.
 service:
   # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
-  type: ClusterIP
+  type: NodePort
   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
-  port: 80
+  backend:
+    port: 8089
+  jupyter:
+    port: 8888
+  # Prometheus scrape port (serviceMonitor.portName below).
+  pm:
+    port: 8887
 
 # This block is for setting up the ingress for more information can be found here: https://kubernetes.io/docs/concepts/services-networking/ingress/
 ingress:

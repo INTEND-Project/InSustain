@@ -12,6 +12,14 @@ spec:
       labels:
         app: {{ include "mongodb.name" . }}
     spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: mongo
           image: {{ include "mongo.fullImage" . }}
@@ -19,15 +27,16 @@ spec:
           ports:
             - containerPort: {{ .Values.service.port }}
           env:
+            {{- $secret := .Values.auth.existingSecret | default (printf "%s-secret" (include "mongodb.fullname" .)) }}
             - name: MONGO_INITDB_ROOT_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "mongodb.fullname" . }}-secret
+                  name: {{ $secret }}
                   key: username
             - name: MONGO_INITDB_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "mongodb.fullname" . }}-secret
+                  name: {{ $secret }}
                   key: password
           volumeMounts:
             - name: mongo-data

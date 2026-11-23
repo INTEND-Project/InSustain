@@ -21,3 +21,11 @@
 .idea/
 *.tmproj
 .vscode/
+# Internal deployment overlays and cluster-specific manifests. Root-anchored
+# so nested chart templates (e.g. charts/*/templates/pvc.yaml) still ship.
+/values-dev.yaml
+/values-production.yaml
+/values-telenor.yaml
+/values-greenstreams-*.yaml
+/generic_values.yaml
+/pvc.yaml

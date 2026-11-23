@@ -3,15 +3,32 @@ image:
   tag: "16"
   pullPolicy: IfNotPresent
 
-# PostgreSQL credentials - can be overridden by global values
+# PostgreSQL credentials - can be overridden by global values. There is no
+# default password: set postgresPassword (or global.postgresql.password), or
+# set existingSecret.
 postgresUser: user
-postgresPassword: password
+postgresPassword: ""
 postgresDb: appdb
+# Name of an existing Secret with keys username and password. When set,
+# POSTGRES_USER/POSTGRES_PASSWORD are read from it and the literal values above
+# (and global.postgresql.user/password) are ignored.
+existingSecret: ""
+
+# Pod-level securityContext (e.g. fsGroup to match a pre-provisioned PV's
+# directory ownership). Empty by default; set per-environment in values-*.yaml.
+podSecurityContext: {}
+
+# Pin the pod to a node. Empty by default (scheduler decides); set per-UC in the
+# umbrella's values-*.yaml. Matters whenever persistence uses a node-local PV
+# (hostPath), since the data only exists on one node.
+nodeSelector: {}
 
 persistence:
   enabled: false
   size: 5Gi
-  storageClassName: "postgres-pvc"
+  # existingClaim: bind to a pre-provisioned PVC instead of creating one.
+  # storageClassName applies only when creating a PVC (existingClaim unset).
+  storageClassName: ""
 
 service:
   type: ClusterIP

@@ -52,11 +52,24 @@ spec:
               protocol: TCP
           env:
             - name: MLFLOW_S3_ENDPOINT_URL
-              value: {{ .Values.global.s3.endpoint }}
+              value: "http://{{ .Release.Name }}-minio.{{ .Release.Namespace }}.svc.cluster.local:9000"
+            {{- with .Values.objectStore.existingSecret }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: rootUser
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: rootPassword
+            {{- else }}
             - name: AWS_ACCESS_KEY_ID
               value: {{ .Values.global.minio.rootUser }}
             - name: AWS_SECRET_ACCESS_KEY
               value: {{ .Values.global.minio.rootPassword }}
+            {{- end }}
             - name: MLFLOW_S3_IGNORE_TLS
               value: "true"
             - name: PROMETHEUS_URL
@@ -65,18 +78,67 @@ spec:
               value: "http://{{ .Release.Name }}-mlflow.{{ .Release.Namespace }}.svc.cluster.local:5000"
             - name: MONGO_URL
               value: "{{ .Release.Name }}-mongodb.{{ .Release.Namespace }}.svc.cluster.local:27017"
+            {{- $mongoSecret := .Values.mongo.existingSecret | default (printf "%s-mongodb-secret" .Release.Name) }}
             - name: MONGO_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-mongodb-secret
+                  name: {{ $mongoSecret }}
                   key: username
             - name: MONGO_PASS
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-mongodb-secret
+                  name: {{ $mongoSecret }}
                   key: password
             - name: MONGO_DB
               value: {{ .Values.mongo.db }}
+            {{- /*
+              Namespace the backend searches first for registered applications'
+              pods. Taken from the pod itself, so it follows the release
+              namespace instead of falling back to the code default "insustain".
+            */}}
+            - name: NAMESPACE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: ENABLE_TRAINING_SCHEDULER
+              value: {{ .Values.trainingScheduler.enabled | toString | quote }}
+            {{- /*
+              Where to publish energy met:Observation Turtle (the partner's
+              intent digital twin). Two sources, in priority order:
+                1. graphdb.url  -- an EXTERNAL GraphDB, set explicitly.
+                2. the in-cluster graphdb subchart, when the umbrella enables it
+                   (global.graphdb.inCluster); the address is derived the same
+                   way as mongodb/mlflow above, so the two can never drift.
+              Neither set = generate the Turtle, return it over the API, skip
+              the push. Note this must resolve FROM THIS POD: a laptop-side
+              localhost:7200 will not.
+            */}}
+            {{- $gdbUrl := .Values.graphdb.url }}
+            {{- if and (not $gdbUrl) .Values.global.graphdb }}
+            {{- if .Values.global.graphdb.inCluster }}
+            {{- $gdbUrl = printf "http://%s-graphdb.%s.svc.cluster.local:%v" .Release.Name .Release.Namespace (.Values.global.graphdb.port | default 7200) }}
+            {{- end }}
+            {{- end }}
+            {{- if $gdbUrl }}
+            - name: GRAPHDB_URL
+              value: {{ $gdbUrl | quote }}
+            - name: GRAPHDB_REPOSITORY
+              value: {{ .Values.graphdb.repository | default "intents_and_intent_reports" | quote }}
+            {{- with .Values.graphdb.graph }}
+            {{- /*
+              Named graph to publish observations INTO (Graph Store Protocol), so
+              reports join the intent that lives there -- the Controller's
+              KG-target graph in the Telenor demo. Empty = repository default
+              graph (legacy). LONG TERM this should travel with the intent, not
+              be a single deploy-wide value; see docs/TELENOR_LOCAL_TESTBED.md.
+            */}}
+            - name: GRAPHDB_GRAPH
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
