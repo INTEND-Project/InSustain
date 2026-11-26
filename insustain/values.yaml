@@ -39,7 +39,7 @@ backend:
     pm:
       port: 8887
   image:
-    digest: sha256:5df3c76289476abe4cdb48e929dc0a10bb013861b57c0fd5a3d2f6d248be3eb0
+    digest: sha256:6a68ab1e5461fca23711762c0c7e81d258df2ed9977bb5c829181582a62fa806
     pullPolicy: IfNotPresent
   serviceMonitor:
     enabled: true
@@ -51,7 +51,7 @@ backend:
 frontend:
   enabled: true
   image:
-    digest: sha256:81153171923d12c281d7d0b53db2a57a5b8a0758d525cacd48a94577867b5a2c
+    digest: sha256:4486dd7165fb61ebe5a0c5114fec420e4114cc938ea0c795b4382ecaf3d5e4f6
     pullPolicy: IfNotPresent
   backend:
     backend:

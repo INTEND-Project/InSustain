@@ -2,8 +2,8 @@ apiVersion: v2
 name: insustain
 description: A Helm chart for Kubernetes
 type: application
-version: 2.0.43
-appVersion: 2.0.43
+version: 2.0.45
+appVersion: 2.0.45
 dependencies:
 - condition: kepler.enabled
   name: kepler
