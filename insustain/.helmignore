@@ -26,6 +26,7 @@
 /values-dev.yaml
 /values-production.yaml
 /values-telenor.yaml
+/values-gate.yaml
 /values-greenstreams-*.yaml
 /generic_values.yaml
 /pvc.yaml

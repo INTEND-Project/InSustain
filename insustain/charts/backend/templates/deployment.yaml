@@ -51,6 +51,14 @@ spec:
               containerPort: {{ .Values.service.pm.port }}
               protocol: TCP
           env:
+            - name: AUTH_ENABLED
+              value: {{ .Values.auth.enabled | quote }}
+            {{- if .Values.auth.enabled }}
+            - name: AUTH_KEYS_FILE
+              value: /var/run/insustain-auth/keys.yaml
+            {{- end }}
+            - name: REPORT_PUSH_ALLOWED_HOSTS
+              value: {{ join "," .Values.reportPush.allowedHosts | quote }}
             - name: MLFLOW_S3_ENDPOINT_URL
               value: "http://{{ .Release.Name }}-minio.{{ .Release.Namespace }}.svc.cluster.local:9000"
             {{- with .Values.objectStore.existingSecret }}
@@ -143,13 +151,42 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.volumeMounts }}
-          volumeMounts:
+          {{- with .Values.startupProbe }}
+          startupProbe:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- with .Values.volumes }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if or .Values.volumeMounts .Values.auth.enabled }}
+          volumeMounts:
+            {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- if .Values.auth.enabled }}
+            - name: insustain-api-auth
+              mountPath: /var/run/insustain-auth
+              readOnly: true
+            {{- end }}
+          {{- end }}
+      {{- if or .Values.volumes .Values.auth.enabled }}
       volumes:
+        {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.auth.enabled }}
+        - name: insustain-api-auth
+          secret:
+            secretName: {{ required "backend.auth.existingSecret is required when auth is enabled" .Values.auth.existingSecret | quote }}
+            items:
+              - key: keys.yaml
+                path: keys.yaml
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

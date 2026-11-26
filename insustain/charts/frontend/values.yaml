@@ -5,6 +5,10 @@
 # This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
 replicaCount: 1
 
+backendApiKey:
+  existingSecret: ""
+  key: frontend-api-key
+
 # The image path is built by the frontend.fullImage helper from
 # global.image.repository + global.image.prefix, so only the tag/policy live here.
 image:

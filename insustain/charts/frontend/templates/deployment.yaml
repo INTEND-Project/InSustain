@@ -51,6 +51,13 @@ spec:
               value: "http://{{ .Release.Name }}-backend.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.backend.backend.port }}"
             - name: PORT
               value: {{ .Values.service.port | quote }}
+            {{- if .Values.backendApiKey.existingSecret }}
+            - name: BACKEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backendApiKey.existingSecret | quote }}
+                  key: {{ required "frontend.backendApiKey.key is required" .Values.backendApiKey.key | quote }}
+            {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

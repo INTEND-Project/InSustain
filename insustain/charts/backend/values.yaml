@@ -5,6 +5,13 @@
 # This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
 replicaCount: 1
 
+auth:
+  enabled: false
+  existingSecret: ""
+
+reportPush:
+  allowedHosts: []
+
 prometheus:
   namespace: monitoring
   serviceName: prometheus-operated
@@ -154,12 +161,18 @@ resources: {}
 # This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 livenessProbe:
   httpGet:
-    path: /docs
+    path: /healthz
     port: backend
   initialDelaySeconds: 30
+startupProbe:
+  httpGet:
+    path: /healthz
+    port: backend
+  periodSeconds: 10
+  failureThreshold: 30
 readinessProbe:
   httpGet:
-    path: /docs
+    path: /healthz
     port: backend
   initialDelaySeconds: 30
 
